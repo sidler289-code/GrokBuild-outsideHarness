@@ -1,5 +1,6 @@
 .phase2-test-*/
 .phase*-test-*/
+.phase*-posix-test.*/
 .tmp/
 tmp*/
 __pycache__/
