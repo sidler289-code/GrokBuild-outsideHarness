@@ -113,6 +113,11 @@
                                                             "rawOutput"
                                                         ],
                                            "properties":  {
+                                                              "warnings": {
+                                                                                "type": "array",
+                                                                                "items": { "type": "string", "maxLength": 4096 },
+                                                                                "description": "Non-fatal diagnostic warnings (e.g. cleanup failure). Do not affect review status."
+                                                                            },
                                                               "durationMs":  {
                                                                                  "type":  "integer",
                                                                                  "minimum":  0

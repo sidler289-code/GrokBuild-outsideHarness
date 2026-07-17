@@ -507,8 +507,17 @@ function Get-PositiveIntegerSetting {
 function Normalize-RepoRelativePath {
     param([string]$Path, [string]$Repo)
     if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
-    $normalized = ($Path.Trim() -replace '\\', '/') -replace '^\./', ''
-    while ($normalized.StartsWith('/')) { $normalized = $normalized.Substring(1) }
+    $normalized = ($Path.Trim() -replace '\\', '/')
+    # Strip leading "./", "../", and "/" as WHOLE prefixes, not a character
+    # set. A regex '^[\./]+' would corrupt names like ".../dawn.js" -> "awn.js"
+    # and silently mis-gate the scope check.
+    while ($true) {
+        $prev = $normalized
+        if ($normalized.StartsWith('./')) { $normalized = $normalized.Substring(2) }
+        if ($normalized.StartsWith('../')) { $normalized = $normalized.Substring(3) }
+        if ($normalized.StartsWith('/')) { $normalized = $normalized.Substring(1) }
+        if ($normalized -eq $prev) { break }
+    }
     $repoNormalized = ($Repo.TrimEnd('\', '/') -replace '\\', '/')
     if ($normalized.Length -ge $repoNormalized.Length -and
         $normalized.Substring(0, $repoNormalized.Length).Equals($repoNormalized, [StringComparison]::OrdinalIgnoreCase)) {
@@ -616,6 +625,14 @@ function Get-ScopeSnapshot {
             }
         } elseif ($Scope.StartsWith('base:')) {
             $base = $Scope.Substring(5)
+            # Validate the base ref BEFORE computing the diff. A typo'd branch
+            # name would otherwise make `git diff` fail silently, leaving an
+            # empty allowlist and mis-gating every finding as out_of_scope.
+            & git rev-parse --verify "${base}^{commit}" 1>$null 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                $snapshot.Note = "Base ref '$base' could not be resolved; scope gate is disabled."
+                return [pscustomobject]$snapshot
+            }
             $names = New-Object System.Collections.Generic.List[string]
             foreach ($name in @(& git -c core.quotepath=false diff --name-only "${base}...HEAD" 2>$null)) {
                 if (-not [string]::IsNullOrWhiteSpace($name)) { $names.Add(($name -replace '\\', '/')) }
@@ -630,6 +647,12 @@ function Get-ScopeSnapshot {
             }
         } else {
             $sha = $Scope.Substring(7)
+            # Same validation for the commit ref: avoid a silently-empty allowlist.
+            & git rev-parse --verify "${sha}^{commit}" 1>$null 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                $snapshot.Note = "Commit ref '$sha' could not be resolved; scope gate is disabled."
+                return [pscustomobject]$snapshot
+            }
             foreach ($name in @(& git -c core.quotepath=false diff-tree --no-commit-id --name-only -r $sha 2>$null)) {
                 if (-not [string]::IsNullOrWhiteSpace($name)) { $names.Add(($name -replace '\\', '/')) }
             }
@@ -1019,10 +1042,6 @@ function Invoke-Review {
     } finally {
         if ($reviewer -eq 'claude') { $claudeCleanupSucceeded = Remove-ClaudeSessionArtifacts $capability $claudeSessionId }
     }
-    if (-not $claudeCleanupSucceeded) {
-        $cleanupFailure = New-ResultEnvelope $task $reviewer 'permission_failed' $capability 'Claude review session cleanup failed.' $processResult
-        return Apply-ScopeGate $cleanupFailure $scopeSnapshot $repo $task
-    }
     if ($processResult.TimedOut -or $null -ne $processResult.StartError -or $processResult.ExitCode -ne 0) {
         $status = Get-FailureStatus $processResult
         $summary = if ($processResult.TimedOut) { "Reviewer timed out after $timeout seconds." }
@@ -1040,7 +1059,25 @@ function Invoke-Review {
     }
     $text = if ($reviewer -eq 'codex') { $processResult.FinalOutput } else { $processResult.Stdout }
     $converted = Convert-ReviewerOutput $task $reviewer $capability $processResult $text
-    Apply-ScopeGate $converted $scopeSnapshot $repo $task
+    $gated = Apply-ScopeGate $converted $scopeSnapshot $repo $task
+    # Cleanup failure does NOT invalidate an otherwise-valid review. Surface it
+    # as a non-fatal diagnostics warning instead of overwriting the result with
+    # permission_failed and discarding the review.
+    if ($reviewer -eq 'claude' -and -not $claudeCleanupSucceeded) {
+        $cleanupWarning = 'Claude session JSONL cleanup failed; the review result is still valid but a session artifact may remain on disk.'
+        if ($null -ne $gated) {
+            if ($null -eq $gated.diagnostics) {
+                Set-ObjectNoteProperty $gated 'diagnostics' ([pscustomobject]@{})
+            }
+            $existingWarnings = @()
+            if ($gated.diagnostics.PSObject.Properties.Match('warnings').Count -gt 0) {
+                $existingWarnings = @($gated.diagnostics.warnings)
+            }
+            if ($cleanupWarning -notin $existingWarnings) { $existingWarnings += $cleanupWarning }
+            Set-ObjectNoteProperty $gated.diagnostics 'warnings' $existingWarnings
+        }
+    }
+    $gated
 }
 
 try {

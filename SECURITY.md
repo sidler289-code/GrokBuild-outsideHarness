@@ -19,7 +19,9 @@ A reviewer can still return incorrect or malicious text. Grok must verify file, 
 
 Scope gates reduce whole-repo drift; they do not prove provider honesty. Binary files may still appear in the allowlist as metadata-only entries.
 
-Claude Code may persist session JSONL even with `--no-session-persistence`; the bridge assigns a UUID and deletes only the exact matching session JSONL under the Claude projects directory. Cleanup failure becomes `permission_failed`.
+Claude Code may persist session JSONL even with `--no-session-persistence`; the bridge assigns a UUID and deletes only the exact matching session JSONL under the Claude projects directory. Cleanup failure is surfaced as a `diagnostics.scope.note`/`rawOutput` warning and does not discard an otherwise-valid review.
+
+Claude's `--tools` flag is CLI-version dependent. For plan reviews the bridge passes an empty `--tools ''` argument to express "no tools"; some Claude Code versions interpret an empty value as a fallback to defaults rather than a strict deny. The bridge also sets `--permission-mode plan` and `--safe-mode`, which are the stronger enforcement signals. Treat "plan review gets no tools" as best-effort, and verify against your installed Claude Code version before relying on it in a hardened environment.
 
 Codex's built-in `review --uncommitted` rejects a simultaneous custom prompt and does not reliably honor the required final schema. Code-oriented reviews therefore use generic `codex exec` with an explicit read-only scope package on stdin.
 

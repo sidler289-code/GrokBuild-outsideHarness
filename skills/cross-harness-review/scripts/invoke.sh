@@ -383,6 +383,17 @@ build_scope_prompt() {
       ;;
     base:*)
       base=${scope#base:}
+      # Validate the base ref BEFORE computing the diff. A typo'd branch name
+      # would otherwise make `git diff` fail silently under `|| true`, leaving
+      # an empty allowlist and mis-gating every finding as out_of_scope.
+      if ! git rev-parse --verify "${base}^{commit}" >/dev/null 2>&1; then
+        note="Base ref '$base' could not be resolved; scope gate is disabled and reviewers must follow the stated scope instruction only."
+        printf '%s\n' "$note" > "$allow_file.note"
+        : > "$allow_file"
+        cd "$old" || true
+        printf '\n## HARD SCOPE BOUNDARY (machine-enforced after your reply)\nScope mode: %s\nNote: %s\nYou MUST only report findings whose evidence.file is in the allowlist below.\nText files in scope:\n- (none)\nBinary or non-text files in scope (metadata only; do not invent line-level findings):\n- (none)\n' "$scope" "$note"
+        return 0
+      fi
       names=$(git -c core.quotepath=false diff --name-only "${base}...HEAD" 2>/dev/null || true)
       if [ -z "$names" ]; then
         names=$(git -c core.quotepath=false diff --name-only "$base" 2>/dev/null || true)
@@ -393,6 +404,15 @@ build_scope_prompt() {
       ;;
     commit:*)
       sha=${scope#commit:}
+      # Same validation for the commit ref: avoid a silently-empty allowlist.
+      if ! git rev-parse --verify "${sha}^{commit}" >/dev/null 2>&1; then
+        note="Commit ref '$sha' could not be resolved; scope gate is disabled and reviewers must follow the stated scope instruction only."
+        printf '%s\n' "$note" > "$allow_file.note"
+        : > "$allow_file"
+        cd "$old" || true
+        printf '\n## HARD SCOPE BOUNDARY (machine-enforced after your reply)\nScope mode: %s\nNote: %s\nYou MUST only report findings whose evidence.file is in the allowlist below.\nText files in scope:\n- (none)\nBinary or non-text files in scope (metadata only; do not invent line-level findings):\n- (none)\n' "$scope" "$note"
+        return 0
+      fi
       names=$(git -c core.quotepath=false diff-tree --no-commit-id --name-only -r "$sha" 2>/dev/null || true)
       diff_text=$(git -c core.quotepath=false show --format= --patch "$sha" 2>/dev/null || true)
       ;;
@@ -475,7 +495,19 @@ for finding in findings:
     if not isinstance(finding,dict):
         updated.append(finding); continue
     evidence=finding.get("evidence") if isinstance(finding.get("evidence"),dict) else {}
-    file_value=str(evidence.get("file") or finding.get("file") or "").replace("\\\\","/").lstrip("./")
+    file_value=str(evidence.get("file") or finding.get("file") or "").replace("\\\\","/")
+    # Strip leading "./", "../", and "/" prefixes as whole prefixes, NOT as a
+    # character set. lstrip("./") would also eat legitimate characters from
+    # names like ".../dawn.js" -> "awn.js", corrupting the scope check.
+    while True:
+        prev=file_value
+        for prefix in ("./","../"):
+            if file_value.startswith(prefix):
+                file_value=file_value[len(prefix):]
+        if file_value.startswith("/"):
+            file_value=file_value[1:]
+        if file_value==prev:
+            break
     in_scope=False
     if allow:
         if file_value in allow: in_scope=True
@@ -606,8 +638,13 @@ $input_body"
         execute_candidate "$SELECT_TYPE" "$SELECT_PATH" "$SELECT_DISTRO" "$run_dir" "$prompt" "$TIMEOUT" exec -C "$exec_repo" -s read-only --ephemeral --ignore-user-config --ignore-rules --output-schema "$exec_schema" -o "$exec_output" -
       fi
     fi
+    claude_cleanup_warning=''
     if [ "$REVIEWER" = claude ] && ! cleanup_claude_session "$SELECT_TYPE" "$SELECT_DISTRO" "$claude_session_id"; then
-      cd "$old_pwd"; emit_envelope permission_failed 'Claude review session cleanup failed.'; cleanup_temp_dir "$run_dir"; exit 0
+      # Cleanup failure does NOT invalidate an otherwise-valid review. Surface
+      # it as a diagnostic warning instead of discarding the result. The only
+      # hard failure from cleanup is when the session file could not be deleted,
+      # which is a local-disk concern, not a review-correctness concern.
+      claude_cleanup_warning='Claude session JSONL cleanup failed; the review result is still valid but a session artifact may remain on disk.'
     fi
     cd "$old_pwd"
     if [ "$PR_TIMED_OUT" = true ] || [ "$PR_EXIT" -ne 0 ]; then status=$(failure_status); emit_envelope "$status" "Reviewer process failed with status $status."; cleanup_temp_dir "$run_dir"; exit 0; fi
@@ -620,14 +657,32 @@ $input_body"
     normalize_error="$run_dir/normalize.err"
     normalize_input="$run_dir/normalize-input.json"
     gated_input="$run_dir/gated-input.json"
+    final_output="$run_dir/final.json"
     printf '%s' "$result" > "$normalize_input"
     if normalized=$(normalize_envelope "$REVIEWER" "$TASK" "$normalize_input" 2>"$normalize_error"); then
       printf '%s' "$normalized" > "$gated_input"
       if gated=$(apply_scope_gate "$gated_input" "$allow_file" "$TASK" "$SCOPE" 2>"$normalize_error"); then
-        printf '%s\n' "$gated"
+        printf '%s' "$gated" > "$final_output"
       else
-        printf '%s\n' "$normalized"
+        printf '%s' "$normalized" > "$final_output"
       fi
+      # Attach any non-fatal diagnostic warning (e.g. Claude session cleanup
+      # failure) without altering the review status or findings.
+      if [ -n "$claude_cleanup_warning" ] && command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
+        if command -v python3 >/dev/null 2>&1; then py=python3; else py=python; fi
+        "$py" -c 'import json,sys
+obj=json.loads(open(sys.argv[1],"rb").read().decode("utf-8","replace"))
+if isinstance(obj,dict):
+    diag=obj.get("diagnostics")
+    if not isinstance(diag,dict):
+        diag={}; obj["diagnostics"]=diag
+    diag["warnings"]=diag.get("warnings") or []
+    w=sys.argv[2]
+    if w not in diag["warnings"]:
+        diag["warnings"].append(w)
+sys.stdout.buffer.write(json.dumps(obj,separators=(",",":"),ensure_ascii=True).encode("ascii"))' "$final_output" "$claude_cleanup_warning" > "$run_dir/final-warned.json" 2>/dev/null && mv -f "$run_dir/final-warned.json" "$final_output"
+      fi
+      cat "$final_output"; printf '\n'
     else
       emit_envelope invalid_output 'Reviewer output was not a valid review envelope.' "$(cat "$normalize_error")
 $result"
