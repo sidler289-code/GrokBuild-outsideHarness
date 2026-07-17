@@ -1,0 +1,35 @@
+{
+    "schemaVersion":  1,
+    "task":  "code",
+    "reviewer":  "codex",
+    "status":  "success",
+    "capability":  {
+                       "version":  "0.144.5",
+                       "runtime":  "windows-native",
+                       "source":  "fixture",
+                       "reason":  null
+                   },
+    "summary":  "Fixture review completed.",
+    "findings":  [
+                     {
+                         "severity":  "medium",
+                         "category":  "correctness",
+                         "title":  "Fixture finding",
+                         "evidence":  {
+                                          "file":  "src/example.rs",
+                                          "line":  42,
+                                          "reason":  "The fixture makes the behavior reachable.",
+                                          "symbol":  null
+                                      },
+                         "recommendation":  "Add the missing guard.",
+                         "confidence":  0.85,
+                         "verification":  "candidate"
+                     }
+                 ],
+    "diagnostics":  {
+                        "durationMs":  12,
+                        "stdoutTruncated":  false,
+                        "stderrTruncated":  false,
+                        "rawOutput":  null
+                    }
+}

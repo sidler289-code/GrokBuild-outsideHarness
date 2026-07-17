@@ -1,0 +1,267 @@
+{
+    "$schema":  "https://json-schema.org/draft/2020-12/schema",
+    "$id":  "https://local.invalid/cross-harness-review/review-result.schema.json",
+    "title":  "Cross-Harness Review Result",
+    "type":  "object",
+    "additionalProperties":  false,
+    "required":  [
+                     "schemaVersion",
+                     "task",
+                     "reviewer",
+                     "status",
+                     "capability",
+                     "summary",
+                     "findings",
+                     "diagnostics"
+                 ],
+    "properties":  {
+                       "schemaVersion":  {
+                                             "const":  1,
+                                             "type":  "integer"
+                                         },
+                       "task":  {
+                                    "enum":  [
+                                                 "plan",
+                                                 "code",
+                                                 "tests",
+                                                 "security"
+                                             ],
+                                    "type":  "string"
+                                },
+                       "reviewer":  {
+                                        "enum":  [
+                                                     "claude",
+                                                     "codex"
+                                                 ],
+                                        "type":  "string"
+                                    },
+                       "status":  {
+                                      "enum":  [
+                                                   "success",
+                                                   "unavailable",
+                                                   "quota_exhausted",
+                                                   "authentication_failed",
+                                                   "permission_failed",
+                                                   "timeout",
+                                                   "invalid_output",
+                                                   "process_failed"
+                                               ],
+                                      "type":  "string"
+                                  },
+                       "capability":  {
+                                          "type":  "object",
+                                          "additionalProperties":  false,
+                                          "required":  [
+                                                           "version",
+                                                           "runtime",
+                                                           "source",
+                                                           "reason"
+                                                       ],
+                                          "properties":  {
+                                                             "version":  {
+                                                                             "type":  [
+                                                                                          "string",
+                                                                                          "null"
+                                                                                      ]
+                                                                         },
+                                                             "runtime":  {
+                                                                             "type":  [
+                                                                                          "string",
+                                                                                          "null"
+                                                                                      ],
+                                                                             "enum":  [
+                                                                                          "windows-native",
+                                                                                          "wsl",
+                                                                                          "linux",
+                                                                                          "macos",
+                                                                                          null
+                                                                                      ]
+                                                                         },
+                                                             "source":  {
+                                                                            "type":  [
+                                                                                         "string",
+                                                                                         "null"
+                                                                                     ]
+                                                                        },
+                                                             "reason":  {
+                                                                            "type":  [
+                                                                                         "string",
+                                                                                         "null"
+                                                                                     ],
+                                                                            "maxLength":  4096
+                                                                        }
+                                                         }
+                                      },
+                       "summary":  {
+                                       "type":  "string",
+                                       "maxLength":  16384
+                                   },
+                       "findings":  {
+                                        "type":  "array",
+                                        "maxItems":  500,
+                                        "items":  {
+                                                      "$ref":  "#/$defs/finding"
+                                                  }
+                                    },
+                       "diagnostics":  {
+                                           "type":  "object",
+                                           "additionalProperties":  false,
+                                           "required":  [
+                                                            "durationMs",
+                                                            "stdoutTruncated",
+                                                            "stderrTruncated",
+                                                            "rawOutput"
+                                                        ],
+                                           "properties":  {
+                                                              "durationMs":  {
+                                                                                 "type":  "integer",
+                                                                                 "minimum":  0
+                                                                             },
+                                                              "stdoutTruncated":  {
+                                                                                      "type":  "boolean"
+                                                                                  },
+                                                              "stderrTruncated":  {
+                                                                                      "type":  "boolean"
+                                                                                  },
+                                                              "rawOutput":  {
+                                                                                "type":  [
+                                                                                             "string",
+                                                                                             "null"
+                                                                                         ],
+                                                                                "maxLength":  32768
+                                                                            },
+                                                              "scope":  {
+                                                                            "type":  [
+                                                                                         "object",
+                                                                                         "null"
+                                                                                     ],
+                                                                            "additionalProperties":  false,
+                                                                            "properties":  {
+                                                                                               "mode":  {
+                                                                                                            "type":  "string",
+                                                                                                            "maxLength":  256
+                                                                                                        },
+                                                                                               "textFiles":  {
+                                                                                                                 "type":  "array",
+                                                                                                                 "maxItems":  500,
+                                                                                                                 "items":  {
+                                                                                                                               "type":  "string",
+                                                                                                                               "maxLength":  4096
+                                                                                                                           }
+                                                                                                             },
+                                                                                               "binaryFiles":  {
+                                                                                                                   "type":  "array",
+                                                                                                                   "maxItems":  500,
+                                                                                                                   "items":  {
+                                                                                                                                 "type":  "string",
+                                                                                                                                 "maxLength":  4096
+                                                                                                                             }
+                                                                                                               },
+                                                                                               "diffTruncated":  {
+                                                                                                                     "type":  "boolean"
+                                                                                                                 },
+                                                                                               "gated":  {
+                                                                                                             "type":  "boolean"
+                                                                                                         },
+                                                                                               "outOfScopeCount":  {
+                                                                                                                       "type":  "integer",
+                                                                                                                       "minimum":  0
+                                                                                                                   }
+                                                                                           }
+                                                                        }
+                                                          }
+                                       }
+                   },
+    "$defs":  {
+                  "finding":  {
+                                  "type":  "object",
+                                  "additionalProperties":  false,
+                                  "required":  [
+                                                   "severity",
+                                                   "category",
+                                                   "title",
+                                                   "evidence",
+                                                   "recommendation",
+                                                   "confidence",
+                                                   "verification"
+                                               ],
+                                  "properties":  {
+                                                     "severity":  {
+                                                                      "enum":  [
+                                                                                   "critical",
+                                                                                   "high",
+                                                                                   "medium",
+                                                                                   "low",
+                                                                                   "info"
+                                                                               ],
+                                                                      "type":  "string"
+                                                                  },
+                                                     "category":  {
+                                                                      "type":  "string",
+                                                                      "minLength":  1,
+                                                                      "maxLength":  128
+                                                                  },
+                                                     "title":  {
+                                                                   "type":  "string",
+                                                                   "minLength":  1,
+                                                                   "maxLength":  512
+                                                               },
+                                                     "evidence":  {
+                                                                      "type":  "object",
+                                                                      "additionalProperties":  false,
+                                                                      "required":  [
+                                                                                       "file",
+                                                                                       "line",
+                                                                                       "symbol",
+                                                                                       "reason"
+                                                                                   ],
+                                                                      "properties":  {
+                                                                                         "file":  {
+                                                                                                      "type":  "string",
+                                                                                                      "minLength":  1,
+                                                                                                      "maxLength":  4096
+                                                                                                  },
+                                                                                         "line":  {
+                                                                                                      "type":  [
+                                                                                                                   "integer",
+                                                                                                                   "null"
+                                                                                                               ],
+                                                                                                      "minimum":  1
+                                                                                                  },
+                                                                                         "symbol":  {
+                                                                                                        "type":  [
+                                                                                                                     "string",
+                                                                                                                     "null"
+                                                                                                                 ],
+                                                                                                        "maxLength":  512
+                                                                                                    },
+                                                                                         "reason":  {
+                                                                                                        "type":  "string",
+                                                                                                        "minLength":  1,
+                                                                                                        "maxLength":  8192
+                                                                                                    }
+                                                                                     }
+                                                                  },
+                                                     "recommendation":  {
+                                                                            "type":  "string",
+                                                                            "minLength":  1,
+                                                                            "maxLength":  8192
+                                                                        },
+                                                     "confidence":  {
+                                                                        "type":  "number",
+                                                                        "minimum":  0,
+                                                                        "maximum":  1
+                                                                    },
+                                                     "verification":  {
+                                                                          "enum":  [
+                                                                                       "candidate",
+                                                                                       "verified",
+                                                                                       "unverified",
+                                                                                       "out_of_scope"
+                                                                                   ],
+                                                                          "type":  "string"
+                                                                      }
+                                                 }
+                              }
+              }
+}

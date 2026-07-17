@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+printf '%s\n' 'codex-cli 2.9.0'

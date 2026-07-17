@@ -1,0 +1,22 @@
+{
+    "schemaVersion":  1,
+    "task":  "plan",
+    "reviewer":  "claude",
+    "status":  "unavailable",
+    "capability":  {
+                       "version":  null,
+                       "runtime":  null,
+                       "source":  "fixture",
+                       "reason":  "No runnable candidate was found."
+                   },
+    "summary":  "Claude is unavailable.",
+    "findings":  [
+
+                 ],
+    "diagnostics":  {
+                        "durationMs":  5,
+                        "stdoutTruncated":  false,
+                        "stderrTruncated":  false,
+                        "rawOutput":  null
+                    }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string"
+    },
+    "findingsJson": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "summary",
+    "findingsJson"
+  ],
+  "additionalProperties": false
+}

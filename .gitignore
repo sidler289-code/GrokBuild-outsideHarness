@@ -1,0 +1,11 @@
+.phase2-test-*/
+.phase*-test-*/
+.tmp/
+tmp*/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.log
+.cross-harness-cache/
+.debug-*/
