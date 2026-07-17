@@ -10,3 +10,5 @@ Thumbs.db
 *.log
 .cross-harness-cache/
 .debug-*/
+node_modules/
+*.tgz

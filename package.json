@@ -1,0 +1,40 @@
+{
+  "name": "@sidler289-code/cross-harness-review",
+  "version": "0.1.0",
+  "description": "Grok plugin: lets Grok call external coding harnesses (Claude Code, OpenAI Codex) as read-only second-opinion reviewers, with a host scope gate and bounded subprocess execution.",
+  "keywords": [
+    "grok",
+    "grok-plugin",
+    "claude-code",
+    "codex",
+    "code-review",
+    "second-opinion",
+    "cross-harness",
+    "security",
+    "llm"
+  ],
+  "license": "MIT",
+  "author": "sidler289-code",
+  "homepage": "https://github.com/sidler289-code/GrokBuild-outsideHarness#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sidler289-code/GrokBuild-outsideHarness.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sidler289-code/GrokBuild-outsideHarness/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "plugin.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md",
+    "config/",
+    "docs/",
+    "skills/"
+  ],
+  "main": "plugin.json"
+}

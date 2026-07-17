@@ -1,0 +1,27 @@
+# Belt-and-suspenders to the `files` allowlist in package.json.
+# Keeps the published tarball lean and excludes dev-only / machine-local artifacts.
+
+# Tests and fake-CLI fixtures are dev-only; not needed to run the plugin.
+tests/
+
+# Test work directories (also gitignored, but guard against accidental publish)
+.phase*-test-*/
+.phase*-posix-test.*/
+.tmp/
+tmp*/
+.debug-*/
+.cross-harness-cache/
+__pycache__/
+*.pyc
+
+# Node / publish artifacts
+node_modules/
+npm-debug.log*
+*.tgz
+.npmrc
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
