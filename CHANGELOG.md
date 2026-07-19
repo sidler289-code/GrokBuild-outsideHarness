@@ -4,6 +4,39 @@
 
 Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
 
+### PR-6 — OpenCode adapter
+
+- **`lib/adapters/opencode.cjs`**: OpenCode CLI adapter (plan section 8.3 /
+  10.3). Non-interactive `opencode run --format json --pure` invocation;
+  `--pure` skips external plugins so ambient plugin config cannot load for an
+  audit turn. Per-call read-only permission policy is injected via
+  `OPENCODE_CONFIG_CONTENT` (grants `read`; denies `edit`, `bash`, `web` and
+  `external_directory`). Prompt is delivered on stdin (never argv).
+  `--dangerously-skip-permissions` (and any `bypass`/`--force` token) is
+  statically rejected at the adapter layer. Each invocation gets a fresh
+  empty temp `OPENCODE_CONFIG_DIR` / `XDG_*` config + cache root so user
+  plugins, rules, stored auth and on-disk config cannot load; the temp dir is
+  declared on `invocation.cleanupPaths` and removed by the adapter `cleanup`.
+  Ambient provider credentials (`OPENAI_API_KEY` / `OPENAI_ORGANIZATION` /
+  `OPENAI_PROJECT_ID` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` /
+  `GOOGLE_API_KEY`) are zeroed defensively.
+- **`lib/adapters/index.cjs`**: `opencode` registered; the registry now
+  exposes `claude`, `codex`, `opencode`. antigravity / cursor remain reserved
+  for PR-7 / PR-8.
+- **Capabilities**: read-side (`repoRead`, `structuredOutput`,
+  `writeRestriction`) declared `verified`; the three tests-side capabilities
+  (`structuredToolEvents`, `approvedCommandRestriction`,
+  `directTestExecution`) stay `unknown` so the role router fails closed for
+  the tests role until the live capability probe is wired (plan 7.3).
+- **Tests**: `tests/node/adapters-opencode.test.cjs` — registry, prompt
+  canary, no-dangerous-flags, `run --format json --pure` argv shape,
+  `OPENCODE_CONFIG_CONTENT` permission policy, isolated env + zeroed
+  credentials, capability declarations, normalize delegation, cleanup. The
+  PR-4 `adapters.test.cjs` registry assertion was relaxed from an exhaustive
+  two-adapter snapshot to the two original adapters (the exhaustive snapshot
+  lives in the per-adapter test files and grows with each adapter PR). Full
+  suite: 187 passing.
+
 ### PR-4 — Claude/Codex adapters and plan/code/security audits
 
 - **`lib/adapters/{index,claude,codex}.cjs`**: adapter contract (plan section 8)
