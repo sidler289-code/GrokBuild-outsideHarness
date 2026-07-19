@@ -42,7 +42,11 @@
     "test:node:entrypoints": "node --test --test-reporter=spec tests/node/entrypoints.test.cjs",
     "test:node:config": "node --test --test-reporter=spec tests/node/config.test.cjs",
     "test:node:discovery": "node --test --test-reporter=spec tests/node/discovery.test.cjs",
-    "test:node:role-router": "node --test --test-reporter=spec tests/node/role-router.test.cjs"
+    "test:node:role-router": "node --test --test-reporter=spec tests/node/role-router.test.cjs",
+    "test:node:scope-snapshot": "node --test --test-reporter=spec tests/node/scope-snapshot.test.cjs",
+    "test:node:prompt-builder": "node --test --test-reporter=spec tests/node/prompt-builder.test.cjs",
+    "test:node:adapters": "node --test --test-reporter=spec tests/node/adapters.test.cjs",
+    "test:node:audit": "node --test --test-reporter=spec tests/node/audit.test.cjs"
   },
   "files": [
     "plugin.json",

@@ -4,6 +4,49 @@
 
 Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
 
+### PR-4 — Claude/Codex adapters and plan/code/security audits
+
+- **`lib/adapters/{index,claude,codex}.cjs`**: adapter contract (plan section 8)
+  for Claude Code and OpenAI Codex. Read-only, no permission-bypass flags,
+  prompt on stdin (never argv), isolated config (each invocation gets a fresh
+  empty temp `CLAUDE_CONFIG_DIR`/`CODEX_HOME` so user hooks, agents, rules and
+  stored auth cannot load). Codex zeroes ambient OpenAI credentials
+  (`OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_PROJECT_ID`). Per-run temp
+  directories are declared on `invocation.cleanupPaths` and removed by the
+  adapter `cleanup`.
+- **`lib/core/scope-snapshot.cjs`**: single owner of the host scope gate (plan
+  9.2 / 12). Selectors `uncommitted`, `base:<ref>`, `commit:<sha>`,
+  `ref:<a>..<b>`; repo-relative normalization that rejects absolute and `../`
+  traversal; `isFileInScope` exact + nested-prefix matching. Ref names may not
+  start with `-` so they cannot masquerade as git options.
+- **`lib/core/prompt-builder.cjs`**: single owner of per-task prompts (plan
+  9.1 / 9.2). Plan/code require a planFile; code/security require a scope
+  snapshot; the strict scope boundary is spelled out in the prompt; extra
+  instructions are bounded and explicitly framed as non-executable.
+- **`lib/core/audit.cjs`**: audit orchestrator. Resolves reviewer(s) per plan
+  2.4 (legacy claude+codex fan-out, single-reviewer degradation, both-
+  unavailable → `unavailable`, configured-mode routing, explicit `--reviewer`
+  one-shot override that never persists). Applies the capability gate per
+  call, refuses to run if the adapter tries to place the prompt in argv,
+  downgrades out-of-scope findings to `verification:"out_of_scope"`, stamps the
+  host-computed planDigest over any reviewer-supplied value, and rejects an
+  empty scope snapshot for code/security tasks (fail-closed).
+- **`lib/policies/{plan,code,security}.cjs`**: pure policy descriptors
+  consulted by the orchestrator.
+- **CLI**: `audit plan|code|security` with the plan-5 subcommand shape and
+  legacy `--reviewer <id> --task <task>` bridge parity. Fail-closed exit
+  codes: only an all-success aggregate exits 0; unavailable exits 3; any
+  transport failure / invalid output / capability mismatch exits 1.
+- **`lib/core/bounded-process.cjs`**: Windows `.cmd`/`.bat`/`.ps1` wrappers
+  now spawn with the per-element-quoting shell mode (post-CVE-2024-27980
+  Node behavior); the prompt stays on stdin and adapter argv contains only
+  fixed flags, so no shell injection surface is introduced.
+- **Tests**: `scope-snapshot.test.cjs`, `prompt-builder.test.cjs`,
+  `adapters.test.cjs` (prompt-canary, no-dangerous-flags, isolated config,
+  cleanup), `audit.test.cjs` (legacy fan-out, explicit reviewer, scope
+  downgrading, planDigest authority, tests-task refusal), entrypoints
+  fail-closed exit code. Full suite: 169 passing.
+
 ### PR-3 — Config, discovery, doctor and role routing
 
 - **`lib/core/config.cjs`**: the single owner of user-config path resolution

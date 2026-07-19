@@ -77,6 +77,41 @@ test('compatibility shims contain no config, discovery, or provider logic', () =
   assert.match(source, /cross-harness-review\.cjs/);
 });
 
+test('audit CLI exits non-zero when no reviewer is available (fail-closed)', async () => {
+  // Force legacy-unconfigured with no legacy reviewers by zeroing PATH so
+  // neither claude nor codex can be discovered. The audit must exit non-zero
+  // rather than silently succeed.
+  const child = spawn(
+    process.execPath,
+    [NODE_ENTRYPOINT, 'audit', 'plan', '--repo', repoPath(), '--plan-file', repoPath('README.md')],
+    {
+      cwd: repoPath(),
+      env: { ...process.env, PATH: '', CROSS_HARNESS_CONFIG: repoPath('.tmp-no-such-config.json') },
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }
+  );
+  const stdout = [];
+  const stderr = [];
+  child.stdout.on('data', (chunk) => stdout.push(chunk));
+  child.stderr.on('data', (chunk) => stderr.push(chunk));
+  const exitCode = await new Promise((resolve) => child.once('close', resolve));
+  assert.notEqual(exitCode, 0, 'audit with no available reviewer must not exit 0');
+});
+
+test('audit CLI rejects the tests task (PR-5 scope)', async () => {
+  const child = spawn(
+    process.execPath,
+    [NODE_ENTRYPOINT, 'audit', 'tests', '--repo', repoPath()],
+    { cwd: repoPath(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+  );
+  const stderr = [];
+  child.stderr.on('data', (chunk) => stderr.push(chunk));
+  const exitCode = await new Promise((resolve) => child.once('close', resolve));
+  assert.notEqual(exitCode, 0);
+  assert.match(Buffer.concat(stderr).toString('utf8'), /PR-5/);
+});
+
 function resolvePosixShell() {
   if (process.platform !== 'win32') {
     return 'sh';
