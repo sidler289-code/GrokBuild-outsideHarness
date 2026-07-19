@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/cross-harness-review/user-config.schema.json",
+  "title": "Cross-Harness Review User Config",
+  "description": "0.2.0 normative user configuration contract. Persists user choices and stable policy only; never auto-discovered executable paths or probe cache. See docs/plans/v0.2.0-node-core-implementation-plan-revised.zh-CN.md section 6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "roles",
+    "testsExecution",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan",
+        "code",
+        "tests"
+      ],
+      "properties": {
+        "plan": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "codex",
+            "opencode",
+            "antigravity",
+            "cursor"
+          ]
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "codex",
+            "opencode",
+            "antigravity",
+            "cursor"
+          ]
+        },
+        "tests": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "codex",
+            "opencode",
+            "antigravity",
+            "cursor"
+          ]
+        }
+      }
+    },
+    "testsExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "mode",
+        "defaultTimeoutSeconds",
+        "maxOutputBytes"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "host-bounded"
+          ]
+        },
+        "defaultTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "maxOutputBytes": {
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 16777216
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

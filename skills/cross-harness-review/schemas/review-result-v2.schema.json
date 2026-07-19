@@ -1,0 +1,381 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/cross-harness-review/review-result-v2.schema.json",
+  "title": "Cross-Harness Review Result v2",
+  "description": "0.2.0 normative normalized result contract. Distinguishes transport status from test outcome. See docs/plans/v0.2.0-node-core-implementation-plan-revised.zh-CN.md section 11.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "task",
+    "role",
+    "reviewer",
+    "status",
+    "summary",
+    "requirements",
+    "findings",
+    "testExecution",
+    "diagnostics"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 2
+    },
+    "task": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "code",
+        "tests",
+        "security"
+      ]
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "code",
+        "tests",
+        "security"
+      ]
+    },
+    "reviewer": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "codex",
+        "opencode",
+        "antigravity",
+        "cursor"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "unavailable",
+        "invalid_request",
+        "configuration_required",
+        "capability_mismatch",
+        "process_failed",
+        "timed_out",
+        "policy_denied",
+        "invalid_output"
+      ]
+    },
+    "planDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 16384
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "testExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempted",
+        "verifiedByEvents",
+        "outcome",
+        "commands",
+        "workspaceChanged"
+      ],
+      "properties": {
+        "attempted": {
+          "type": "boolean"
+        },
+        "verifiedByEvents": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "inconclusive",
+            "not_run",
+            "policy_blocked"
+          ]
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/testCommand"
+          }
+        },
+        "workspaceChanged": {
+          "type": "boolean"
+        },
+        "workspaceChanges": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "durationMs"
+      ],
+      "properties": {
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stdoutTruncated": {
+          "type": "boolean"
+        },
+        "stderrTruncated": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "rawOutput": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32768
+        }
+      }
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "implemented",
+            "partial",
+            "missing",
+            "deviated",
+            "not_verifiable"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/requirementEvidence"
+          }
+        }
+      }
+    },
+    "requirementEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "reason"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "symbol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "category",
+        "title",
+        "evidence",
+        "recommendation",
+        "confidence",
+        "verification"
+      ],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file",
+            "line",
+            "symbol",
+            "reason"
+          ],
+          "properties": {
+            "file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "line": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "symbol": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 512
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            }
+          }
+        },
+        "recommendation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "verification": {
+          "type": "string",
+          "enum": [
+            "candidate",
+            "verified",
+            "unverified",
+            "out_of_scope"
+          ]
+        }
+      }
+    },
+    "testCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "argv",
+        "cwd",
+        "exitCode",
+        "durationMs",
+        "timedOut"
+      ],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "exitCode": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timedOut": {
+          "type": "boolean"
+        },
+        "stdoutTruncated": {
+          "type": "boolean"
+        },
+        "stderrTruncated": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

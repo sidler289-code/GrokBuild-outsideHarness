@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/cross-harness-review/adapter-capabilities.schema.json",
+  "title": "Cross-Harness Review Adapter Capabilities",
+  "description": "0.2.0 normative adapter capability probe result. A capability is verified, failed, or unknown; unknown and failed both fail-closed at the role gate. See docs/plans/v0.2.0-node-core-implementation-plan-revised.zh-CN.md section 7.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "repoRead",
+    "structuredOutput",
+    "writeRestriction",
+    "structuredToolEvents",
+    "approvedCommandRestriction",
+    "directTestExecution"
+  ],
+  "properties": {
+    "repoRead": {
+      "$ref": "#/$defs/capabilityState"
+    },
+    "structuredOutput": {
+      "$ref": "#/$defs/capabilityState"
+    },
+    "writeRestriction": {
+      "$ref": "#/$defs/capabilityState"
+    },
+    "structuredToolEvents": {
+      "$ref": "#/$defs/capabilityState"
+    },
+    "approvedCommandRestriction": {
+      "$ref": "#/$defs/capabilityState"
+    },
+    "directTestExecution": {
+      "$ref": "#/$defs/capabilityState"
+    }
+  },
+  "$defs": {
+    "capabilityState": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "failed",
+        "unknown"
+      ]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "testsExecution": {
+    "commands": [
+      {
+        "id": "unit",
+        "argv": ["npm", "test"],
+        "cwd": ".",
+        "timeoutSeconds": 600
+      }
+    ],
+    "environmentAllowlist": ["CI", "NODE_ENV"],
+    "artifacts": ["coverage/**", "test-results/**"]
+  }
+}

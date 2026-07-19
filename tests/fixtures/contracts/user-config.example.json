@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "roles": {
+    "plan": "claude",
+    "code": "claude",
+    "tests": "opencode"
+  },
+  "testsExecution": {
+    "enabled": true,
+    "mode": "host-bounded",
+    "defaultTimeoutSeconds": 600,
+    "maxOutputBytes": 1048576
+  },
+  "createdAt": "2026-07-18T00:00:00.000Z",
+  "updatedAt": "2026-07-18T00:00:00.000Z"
+}

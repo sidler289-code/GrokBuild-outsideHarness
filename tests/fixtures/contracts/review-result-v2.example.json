@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 2,
+  "task": "tests",
+  "role": "tests",
+  "reviewer": "opencode",
+  "status": "success",
+  "planDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "summary": "Two tests failed.",
+  "requirements": [],
+  "findings": [],
+  "testExecution": {
+    "attempted": true,
+    "verifiedByEvents": true,
+    "outcome": "failed",
+    "commands": [
+      {
+        "argv": ["npm", "test"],
+        "cwd": ".",
+        "exitCode": 1,
+        "durationMs": 24001,
+        "timedOut": false,
+        "stdoutTruncated": false,
+        "stderrTruncated": false
+      }
+    ],
+    "workspaceChanged": true,
+    "workspaceChanges": ["?? coverage/"],
+    "artifacts": []
+  },
+  "diagnostics": {
+    "durationMs": 24500
+  }
+}
