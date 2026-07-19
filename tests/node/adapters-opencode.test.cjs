@@ -44,8 +44,9 @@ function invocation() {
 test('opencode: registered in the adapter registry', () => {
   assert.ok(listAdapterIds().includes('opencode'));
   assert.equal(getAdapter('opencode'), opencode);
-  // claude + codex must still be present; opencode is additive.
-  assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'opencode']);
+  // Exhaustive registry snapshot. Grows with each adapter PR; cursor joined
+  // in PR-7, antigravity is reserved for PR-8.
+  assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'cursor', 'opencode']);
 });
 
 test('opencode: stable id, display name and binary name', () => {

@@ -47,6 +47,7 @@
     "test:node:prompt-builder": "node --test --test-reporter=spec tests/node/prompt-builder.test.cjs",
     "test:node:adapters": "node --test --test-reporter=spec tests/node/adapters.test.cjs",
     "test:node:adapters-opencode": "node --test --test-reporter=spec tests/node/adapters-opencode.test.cjs",
+    "test:node:adapters-cursor": "node --test --test-reporter=spec tests/node/adapters-cursor.test.cjs",
     "test:node:audit": "node --test --test-reporter=spec tests/node/audit.test.cjs"
   },
   "files": [

@@ -4,6 +4,43 @@
 
 Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
 
+### PR-7 — Cursor adapter
+
+- **`lib/adapters/cursor.cjs`**: Cursor CLI adapter (plan section 8.5 /
+  10.5). Non-interactive `cursor-agent --print --output-format stream-json`
+  invocation. **`--force` is never emitted** and any `--dangerously*` /
+  `bypass` token is statically rejected at the adapter layer (the headline
+  plan 8.5 guarantee). A fresh per-call permission-config file is written for
+  every invocation denying the entire Write family (`Write`, `Edit`,
+  `MultiEdit`) and every shell tool (`Shell`, `Bash`, `Terminal`); MCP is set
+  to an empty list. Prompt is delivered on stdin (never argv). Each
+  invocation redirects every Cursor config / state / cache root
+  (`CURSOR_CONFIG_DIR`, `CURSOR_CACHE_DIR`, `CURSOR_STATE_DIR`, `XDG_*`) at a
+  fresh empty temp dir so user rules, project rules, stored auth and on-disk
+  MCP config cannot load; the temp dir + permission file are declared on
+  `invocation.cleanupPaths` and removed by the adapter `cleanup`. Ambient
+  provider credentials (`OPENAI_API_KEY` / `OPENAI_ORGANIZATION` /
+  `OPENAI_PROJECT_ID` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` /
+  `GOOGLE_API_KEY`) are zeroed defensively.
+- **`lib/adapters/index.cjs`**: `cursor` registered; the registry now exposes
+  `claude`, `codex`, `opencode`, `cursor`. antigravity remains reserved for
+  PR-8.
+- **Capabilities**: read-side (`repoRead`, `structuredOutput`,
+  `writeRestriction`) declared `verified`; the three tests-side capabilities
+  (`structuredToolEvents`, `approvedCommandRestriction`,
+  `directTestExecution`) stay `unknown` so the role router fails closed for
+  the tests role. This is the plan 8.5 fail-closed rule: where Cursor cannot
+  be reliably prevented from auto-loading user/project MCP and rules, the
+  tests role must not open until the live capability probe is wired.
+- **Tests**: `tests/node/adapters-cursor.test.cjs` — registry (exhaustive
+  four-adapter snapshot), prompt canary, **no-`--force`** guarantee,
+  `--print --output-format stream-json` argv shape, per-call permission
+  config file denying Write/Edit/MultiEdit/Shell/Bash/Terminal, isolated env
+  + zeroed credentials, capability declarations, normalize delegation,
+  cleanup, and a distinct-per-invocation permission-file check. The PR-6
+  opencode registry snapshot was extended to the four-adapter set. Full suite:
+  201 passing.
+
 ### PR-6 — OpenCode adapter
 
 - **`lib/adapters/opencode.cjs`**: OpenCode CLI adapter (plan section 8.3 /
