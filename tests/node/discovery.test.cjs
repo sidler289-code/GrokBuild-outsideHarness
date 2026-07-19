@@ -70,12 +70,8 @@ function writeBrokenBin(dir, name) {
 // 2.3 Harness registry.
 // ---------------------------------------------------------------------------
 
-test('2.3: registry exposes exactly the four supported harness ids', () => {
-  assert.deepEqual(Object.keys(HARNESS_REGISTRY).sort(), ['claude', 'codex', 'cursor', 'opencode']);
-});
-
-test('2.3: cursor registry records cursor-agent primary and agent alias', () => {
-  assert.deepEqual(HARNESS_REGISTRY.cursor.binaryNames, ['cursor-agent', 'agent']);
+test('2.3: registry exposes exactly the three supported harness ids', () => {
+  assert.deepEqual(Object.keys(HARNESS_REGISTRY).sort(), ['claude', 'codex', 'opencode']);
 });
 
 
@@ -99,7 +95,6 @@ test('7.2: buildSearchDirs includes PATH entries and known dirs', () => {
   assert.ok(dirs.includes('/usr/local/bin'));
   assert.ok(dirs.includes('/usr/bin'));
   assert.ok(dirs.includes(path.join('/home/u', '.local', 'bin')));
-  assert.ok(dirs.includes(path.join('/home/u', '.cursor', 'bin')));
 });
 
 test('7.2: buildSearchDirs splits Windows PATH on semicolons', () => {
@@ -244,18 +239,6 @@ test('detectHarness reports available when probe prints a version', async () => 
   }
 });
 
-test('cursor generic agent alias must identify itself as Cursor', () => {
-  const genericAgent = { binaryName: 'agent', path: 'C:/tools/agent.exe' };
-  assert.equal(
-    candidateIdentityMatches('cursor', genericAgent, { stdout: 'Grok agent 0.9.0', stderr: '' }),
-    false
-  );
-  assert.equal(
-    candidateIdentityMatches('cursor', genericAgent, { stdout: 'Cursor Agent 2026.07', stderr: '' }),
-    true
-  );
-  assert.equal(candidateIdentityMatches('codex', genericAgent, { stdout: 'anything', stderr: '' }), true);
-});
 
 test('detectHarness reports spawn_failed / version_probe_failed on bad binaries', async () => {
   const dir = makeBinDir('bad');

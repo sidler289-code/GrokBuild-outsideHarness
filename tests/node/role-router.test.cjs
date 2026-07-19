@@ -184,7 +184,7 @@ test('2.4: routeLegacy returns empty reviewers when both unavailable', () => {
   assert.deepEqual(unavailable, ['claude', 'codex']);
 });
 
-test('2.4: legacy report never implicitly lists opencode/cursor', () => {
+test('2.4: legacy report never implicitly lists OpenCode', () => {
   // detectImpl is injectable; supply only legacy ids, ensure the report shape
   // does not surface the new adapters even if a buggy detector returned them.
   const report = legacyRolesReport({

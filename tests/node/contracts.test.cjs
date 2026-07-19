@@ -377,13 +377,15 @@ test('review-result-v2: testExecution.outcome enum locked (different from transp
 test('review-result-v2: reviewer must be a known stable harness id', () => {
   const schema = loadSchema(SCHEMA.RESULT_V2);
   const example = loadJson(FIXTURE.RESULT_V2);
-  for (const r of ['claude', 'codex', 'opencode', 'cursor']) {
+  for (const r of ['claude', 'codex', 'opencode']) {
     validate(Object.assign({}, example, { reviewer: r }), schema);
   }
-  assert.throws(
-    () => validate(Object.assign({}, example, { reviewer: 'antigravity' }), schema),
-    ValidationError
-  );
+  for (const reviewer of ['cursor', 'antigravity']) {
+    assert.throws(
+      () => validate(Object.assign({}, example, { reviewer }), schema),
+      ValidationError
+    );
+  }
 });
 
 test('review-result-v2: planDigest must be sha256:hex64 when present', () => {

@@ -41,7 +41,7 @@ function invocation(adapter) {
 test('adapter registry exposes claude and codex for PR-4', () => {
   // PR-6 adds opencode; claude/codex must remain present. The exhaustive
   // registry assertion lives in adapters-opencode.test.cjs (and will grow with
-  // cursor in PR-7), so this PR-4 test only pins the two original adapters.
+  // future adapters), so this PR-4 test only pins the two original adapters.
   assert.ok(listAdapterIds().includes('claude'));
   assert.ok(listAdapterIds().includes('codex'));
   assert.equal(getAdapter('claude'), claude);

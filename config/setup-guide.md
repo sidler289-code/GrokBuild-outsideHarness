@@ -33,7 +33,6 @@ CROSS_HARNESS_CONFIG
 CROSS_HARNESS_CLAUDE_BIN
 CROSS_HARNESS_CODEX_BIN
 CROSS_HARNESS_OPENCODE_BIN
-CROSS_HARNESS_CURSOR_BIN
 ```
 
 A broken explicit executable override fails closed and does not silently fall back. Review subprocesses use a 300-second default timeout and capped output.
@@ -48,6 +47,8 @@ A broken explicit executable override fails closed and does not silently fall ba
 - PowerShell uses `skills/cross-harness-review/scripts/invoke.ps1`.
 - Linux, WSL, and Git Bash use `invoke.sh` when a native executable is available.
 - On Windows, shell wrappers (`.cmd`, `.bat`, `.ps1`) are rejected; configure a native `.exe` override rather than enabling shell parsing.
+
+Cursor support is intentionally deferred. Its adapter preparation is not discoverable or assignable until Windows launcher handling and project rule/MCP isolation are verified.
 
 ## Troubleshooting
 

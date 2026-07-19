@@ -1,248 +1,127 @@
 # Cross-Harness Review
 
-> A **Grok plugin** that lets Grok call **external coding harnesses and their
-> models** — currently [Claude Code](https://docs.claude.com/en/docs/claude-code)
-> and [OpenAI Codex](https://github.com/openai/codex) — to get a read-only
-> **second opinion** on your code, plans, tests, and security.
+Cross-Harness Review is a Grok plugin and Node CLI for obtaining a bounded,
+read-only second opinion from external coding harnesses. Grok remains the
+decision maker: every reviewer result is untrusted evidence that must be
+verified locally before any change is made.
 
-Grok stays in the driver's seat. This plugin is a **transport**, not an
-authority: the external reviewer runs in a locked-down, read-only sandbox, and
-its output is treated as *untrusted candidate evidence* that Grok verifies
-before any fix.
+## v0.2.0 at a glance
 
-```
- ┌───────────┐      slash / natural language      ┌──────────────────────────┐
- │           │  ────────────────────────────────▶ │  cross-harness-review    │
- │   Grok    │                                     │  plugin (this repo)      │
- │  (driver) │  ◀──────────────────────────────── │                          │
- │           │   normalized review envelope +      │  ┌─── bridge ────────┐   │
- └───────────┘   diagnostics.scope gate            │  │ invoke.ps1/.sh    │   │
-       ▲                                          │  └────────┬───────────┘   │
-       │ verified findings only                    └───────────┼───────────────┘
-       │                                                      │ stdin, bounded
-       │                                          ┌────────────▼────────────┐
-       │                                          │  External harness (CLI) │
-       └──────────────────────────────────────────┤  • Claude Code (claude) │
-                                                  │  • OpenAI Codex (codex) │
-                                                  │  read-only / sandboxed  │
-                                                  └─────────────────────────┘
-```
-
-## Why
-
-A single model can be confidently wrong. This plugin lets Grok pull in a
-genuinely independent reviewer — a *different* harness with a *different*
-model — for plan soundness, code-review depth, test-strategy gaps, and
-security passes, without handing over control or write access.
-
-Two invocation modes:
-
-| Skill | Trigger | Use when |
-|---|---|---|
-| `cross-harness-review` | Slash only: `/cross-harness-review …` | You want an explicit, user-triggered review |
-| `cross-harness-auto` | Model + slash | You want Grok to **auto-run** a review when you ask in natural language ("give me a second opinion", "cross-check with Claude before I open the PR") |
-
-## What it reviews
-
-```text
-/cross-harness-review plan [plan-file]
-/cross-harness-review code  [--uncommitted | --base <branch> | --commit <sha>]
-/cross-harness-review tests  [same scope as code]
-/cross-harness-review security  [same scope as code]
-```
-
-For `code` / `tests` / `security`, scope defaults to `--uncommitted`.
-
-## Architecture
-
-```
-cross-harness-review/
-├── plugin.json                 # Grok plugin manifest
-├── package.json                # npm manifest (distribution)
-├── skills/
-│   ├── cross-harness-review/   # explicit slash skill (disable-model-invocation: true)
-│   │   ├── SKILL.md            # workflow + safety invariants Grok follows
-│   │   ├── scripts/
-│   │   │   ├── invoke.ps1      # Windows bridge
-│   │   │   └── invoke.sh       # POSIX / WSL bridge
-│   │   └── schemas/
-│   │       ├── review-result-v2.schema.json # normalized v2 envelope schema
-│   │       └── claude-result.schema.json   # Claude structured-output contract
-│   └── cross-harness-auto/     # model-invocable skill (when to auto-run)
-│       └── SKILL.md
-├── config/
-│   ├── empty-mcp.json          # explicitly empty MCP config (Phase A ships none)
-│   └── setup-guide.md
-├── tests/                      # PowerShell + POSIX fake-CLI matrices
-└── docs/
-    ├── ACCEPTANCE.md           # release checklist
-    └── verification/           # phase gates
-```
-
-### How a review flows
-
-1. **Grok** parses the request, discloses the data boundary, and resolves the
-   sibling `scripts/` directory (no reliance on `GROK_PLUGIN_ROOT`).
-2. **`detect --json`** discovers the four supported harness IDs from explicit
-   `*_BIN` overrides, `PATH`, npm's Windows bin directory, and known local bin
-   directories; each candidate receives a bounded `--version` probe.
-3. **`audit`** applies configured role routing (or legacy Claude/Codex fan-out),
-   writes the prompt to **stdin** (never argv), and launches the reviewer in a
-   bounded subprocess with a 300-second timeout and capped stdout/stderr.
-4. **Host scope gate** builds a changed-file allowlist from Git, sends a hard
-   scope boundary to the reviewer, and rewrites any finding whose
-   `evidence.file` is outside the allowlist to `verification: out_of_scope`.
-5. **Normalization** unwraps Claude JSON (including prose-wrapped Markdown JSON
-   fences), Cursor NDJSON, and OpenCode JSONL into the strict v2 contract
-   (`review-result-v2.schema.json`).
-6. **Grok** opens the cited evidence locally, confirms the call path, and only
-   then acts. Reviewer output never edits files on its own.
-
-### Safety invariants
-
-- Claude plan review: **no tools**. Code-oriented review: `Read,Grep,Glob` only.
-- Codex: `read-only` sandbox, `--ephemeral`, `--ignore-user-config`,
-  `--ignore-rules`.
-- Prompts travel on **stdin**; output and diagnostics are size-capped.
-- No hooks, no agents, no active MCP server, no model override, no
-  permission/sandbox bypass flags.
-- Reviewer success is never approval to edit — only the user's request is.
-
-See [SECURITY.md](SECURITY.md) for the full boundary and known limitations.
+- Supported reviewer IDs: `claude`, `codex`, and `opencode`.
+- One Node core owns discovery, configuration, routing, bounded execution, and
+  normalized v2 results. PowerShell and POSIX scripts are forwarding shims.
+- Prompts are sent on stdin, output is bounded, and review scope is enforced by
+  a host-computed Git snapshot.
+- Direct host test execution is opt-in and fails closed unless the user policy,
+  project allowlist, and adapter capabilities all permit it.
+- Cursor is deliberately deferred. Its preparatory source remains in the
+  repository but is not discoverable, configurable, assignable, or accepted by
+  the public result schema.
 
 ## Requirements
 
-- **Grok CLI** with plugin support.
-- At least one of:
-  - **Claude Code CLI** (`claude`) — installed and authenticated.
-  - **Codex CLI** (`codex`) — installed and authenticated.
-- `git` on `PATH` (used for the scope snapshot and host scope gate).
+- Grok CLI with plugin support.
+- Node.js 20 or later.
+- Git on `PATH`.
+- At least one authenticated reviewer CLI: Claude Code (`claude`), OpenAI
+  Codex (`codex`), or OpenCode (`opencode`).
 
 ## Install
 
-Pick whichever path matches how you obtained the plugin. The plugin files are
-identical in all three cases.
-
-### Option A — Install from npm (recommended)
+### npm package
 
 ```bash
 npm install -g @sidler289-code/cross-harness-review
-```
-
-Then point Grok at the installed package directory:
-
-```bash
 grok plugin install "$(npm root -g)/@sidler289-code/cross-harness-review" --trust
 grok plugin enable cross-harness-review
-grok plugin list
 ```
 
-### Option B — Install directly from GitHub
+### GitHub checkout
 
 ```bash
 grok plugin install https://github.com/sidler289-code/GrokBuild-outsideHarness.git --trust
 grok plugin enable cross-harness-review
 ```
 
-### Option C — Local checkout
+Verify the installation:
 
 ```bash
-git clone https://github.com/sidler289-code/GrokBuild-outsideHarness.git
-grok plugin install /absolute/path/to/GrokBuild-outsideHarness --trust
-grok plugin enable cross-harness-review
-```
-
-### Enable in config
-
-Ensure `~/.grok/config.toml` contains:
-
-```toml
-[plugins]
-enabled = ["cross-harness-review"]
-```
-
-### Verify
-
-```bash
+cross-harness-review --version
 grok inspect
 ```
 
-Should list two skills (`cross-harness-review`, `cross-harness-auto`) and
-**no** agents, hooks, or MCP servers.
+The CLI should report `0.2.0`. Grok should list the two skills
+`cross-harness-review` and `cross-harness-auto`, with no hooks, agents, or
+active MCP server.
 
-## Usage
+## v0.2.0 workflow
 
-Run a probe first to confirm the bridge can see your reviewer CLIs:
+Discover installed reviewer CLIs, persist an explicit role mapping, and verify
+it before an audit:
 
 ```bash
-# From the plugin root, or wherever invoke.* lives after install
-skills/cross-harness-review/scripts/invoke.ps1 detect --json   # Windows
-skills/cross-harness-review/scripts/invoke.sh detect --json    # POSIX / Git Bash
+cross-harness-review detect --json
+cross-harness-review setup --plan claude --code codex --tests opencode --json
+cross-harness-review roles --json
 ```
 
-Then ask Grok, either explicitly or in natural language:
+The example assigns three roles explicitly. You may use one, two, or three of
+the supported IDs, subject to their capability gates. `setup` does not enable
+direct test execution by default. Do not pass `--enable-tests` until the
+selected adapter has verified structured events, approved-command restriction,
+and direct execution.
+
+### Run reviews
+
+```bash
+cross-harness-review audit plan --plan-file docs/plan.md --repo . --json
+cross-harness-review audit code --plan-file docs/plan.md --repo . --scope uncommitted --json
+cross-harness-review audit security --repo . --scope base:main --json
+cross-harness-review audit tests --repo . --json
+```
+
+From Grok, use the explicit slash workflow, for example:
 
 ```text
 /cross-harness-review code --uncommitted
-
-# or just:
-"give me a Claude + Codex cross-review of my uncommitted changes before I commit"
 ```
 
-### Bridge CLI (advanced / scripting)
-
-```text
-invoke.ps1|invoke.sh detect --json
-invoke.ps1|invoke.sh setup --plan <id> --code <id> --tests <id> [--enable-tests]
-invoke.ps1|invoke.sh audit plan --plan-file <path> --repo <path> --json
-invoke.ps1|invoke.sh audit code --plan-file <path> --repo <path> --scope <selector> --json
-invoke.ps1|invoke.sh audit security --repo <path> --scope <selector> --json
-invoke.ps1|invoke.sh audit tests --repo <path> --json
-```
-
-Never concatenate user input into a shell string — pass every value as an
-individual process argument.
+Natural-language requests may invoke the auto skill when appropriate. Reviewer
+output never has authority to edit the working tree.
 
 ## Configuration
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `CROSS_HARNESS_CONFIG` | Absolute user-config path override | platform default |
-| `CROSS_HARNESS_CLAUDE_BIN` | Explicit Claude executable | auto-discovered |
-| `CROSS_HARNESS_CODEX_BIN` | Explicit Codex executable | auto-discovered |
-| `CROSS_HARNESS_OPENCODE_BIN` | Explicit OpenCode executable | auto-discovered |
-| `CROSS_HARNESS_CURSOR_BIN` | Explicit Cursor executable | auto-discovered |
-
-A broken explicit-executable override fails closed — it does **not** silently
-fall back.
-
-## Status
-
-Current checkout: **v0.2.0-dev** (unreleased).
-
-| Area | State |
+| Variable | Purpose |
 |---|---|
-| Node CLI, compatibility shims, detect and setup | Ready |
-| Node offline test matrix | Ready |
-| Scope snapshot + host scope gate | Ready |
-| Claude | Real CLI invocation verified; decorated JSON is normalized before strict v2 validation |
-| Codex / OpenCode adapters | Capability-gated; a local `process_failed` may still require host auth/config diagnosis |
-| Cursor | Detection only until safe isolation is verified; roles fail closed |
-| Direct tests | Disabled unless user + project policy and adapter event capabilities all pass |
+| `CROSS_HARNESS_CONFIG` | Absolute user-config path override |
+| `CROSS_HARNESS_CLAUDE_BIN` | Explicit Claude executable |
+| `CROSS_HARNESS_CODEX_BIN` | Explicit Codex executable |
+| `CROSS_HARNESS_OPENCODE_BIN` | Explicit OpenCode executable |
 
-See the [v0.2.0 Grok host smoke record](docs/verification/v0.2.0-grok-host-smoke.md)
-for the supplied real-CLI evidence and its host/sandbox boundary.
+A broken explicit override fails closed; it does not fall back to another
+binary. On Windows, shell wrappers (`.cmd`, `.bat`, `.ps1`) remain
+rejected by the argv-only subprocess runner.
+
+## Security boundary
+
+- Claude uses a restricted tool set and empty MCP configuration.
+- Codex uses a read-only, ephemeral sandbox and ignores user config and rules.
+- Prompts travel through stdin, not argv; output and diagnostics are capped.
+- No permission or sandbox bypass flags are used.
+- Findings outside the selected Git scope are downgraded to
+  `verification: out_of_scope`.
+
+See [SECURITY.md](SECURITY.md), [the v0.2.0 verification record](docs/verification/release.md), and [the host smoke record](docs/verification/v0.2.0-grok-host-smoke.md) for the evidence boundary and release details.
 
 ## Local validation
 
 ```powershell
-# From plugin root
 grok plugin validate .
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/probe.Tests.ps1
-# Optional on POSIX:
-# bash --login tests/probe.tests.sh
+npm.cmd run test:node
+npm.cmd pack --dry-run
 ```
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT ? see [LICENSE](LICENSE).

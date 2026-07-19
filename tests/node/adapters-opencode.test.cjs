@@ -44,9 +44,9 @@ function invocation() {
 test('opencode: registered in the adapter registry', () => {
   assert.ok(listAdapterIds().includes('opencode'));
   assert.equal(getAdapter('opencode'), opencode);
-  // Exhaustive registry snapshot. Grows with each adapter PR; cursor joined
-  // in PR-7; the supported adapter set is now complete.
-  assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'cursor', 'opencode']);
+  // Cursor remains an unregistered experimental adapter until its isolation
+  // contract is verified on supported platforms.
+  assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'opencode']);
 });
 
 test('opencode: stable id, display name and binary name', () => {

@@ -1,6 +1,6 @@
 {
   "name": "@sidler289-code/cross-harness-review",
-  "version": "0.2.0-dev",
+  "version": "0.2.0",
   "description": "Grok plugin for capability-gated, read-only second-opinion reviews through supported external coding harnesses, with a host scope gate and bounded subprocess execution.",
   "keywords": [
     "grok",
@@ -8,7 +8,6 @@
     "claude-code",
     "codex",
     "opencode",
-    "cursor",
     "code-review",
     "second-opinion",
     "cross-harness",

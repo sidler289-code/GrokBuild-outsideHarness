@@ -42,7 +42,7 @@ test('Node CLI exposes deterministic help and version output', async () => {
   assert.equal(help.exitCode, 0);
   assert.match(help.stdout, /^Usage: cross-harness-review/m);
   assert.equal(version.exitCode, 0);
-  assert.match(version.stdout, /^0\.2\.0-dev\r?\n$/);
+  assert.match(version.stdout, /^0\.2\.0\r?\n$/);
 });
 
 test('PowerShell, POSIX, and direct Node entrypoints have equivalent help results', async (t) => {

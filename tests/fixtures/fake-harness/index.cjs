@@ -5,7 +5,7 @@
  *
  * The fake harness is spawned directly via `node <abs>/index.cjs [flags]`
  * with the prompt arriving on stdin (never argv). It is a stand-in for any
- * real adapter (claude / codex / opencode / cursor) during
+ * real adapter (claude / codex / opencode) during
  * Node-only tests that must not touch a real CLI.
  *
  * Mode selection is via the FAKE_HARNESS_MODE environment variable, set

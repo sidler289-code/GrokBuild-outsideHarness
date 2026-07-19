@@ -37,7 +37,7 @@
     "reviewer": {
       "title": "Reviewer",
       "type": "string",
-      "enum": ["claude", "codex", "opencode", "cursor"]
+      "enum": ["claude", "codex", "opencode"]
     },
     "status": {
       "title": "Status",

@@ -258,11 +258,13 @@ test('6.3: rejects unknown role key', () => {
   );
 });
 
-test('6.3: rejects unknown role value', () => {
-  assert.throws(
-    () => validateUserConfig(validConfig({ roles: roleMap('antigravity', 'claude', 'opencode') })),
-    (err) => err instanceof ConfigError && err.code === 'invalid_field'
-  );
+test('6.3: rejects unsupported and unknown role values', () => {
+  for (const harnessId of ['cursor', 'antigravity']) {
+    assert.throws(
+      () => validateUserConfig(validConfig({ roles: roleMap(harnessId, 'claude', 'opencode') })),
+      (err) => err instanceof ConfigError && err.code === 'invalid_field'
+    );
+  }
 });
 
 test('6.3: testsExecution boundaries enforced', () => {

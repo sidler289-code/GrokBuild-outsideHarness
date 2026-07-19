@@ -45,11 +45,10 @@ function invocation() {
 // Registry.
 // ---------------------------------------------------------------------------
 
-test('cursor: registered in the adapter registry', () => {
-  assert.ok(listAdapterIds().includes('cursor'));
-  assert.equal(getAdapter('cursor'), cursor);
-  // claude + codex + opencode must still be present; cursor is additive.
-  assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'cursor', 'opencode']);
+test('cursor: remains a private preparation and is not registered', () => {
+  assert.equal(listAdapterIds().includes('cursor'), false);
+  assert.throws(() => getAdapter('cursor'), /No adapter registered/);
+  assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'opencode']);
 });
 
 test('cursor: stable id, display name and binary-name priority', () => {
@@ -188,7 +187,7 @@ test('cursor: buildInvocation requires program, prompt and repoRoot', () => {
 // normalizeFinalResult delegates to the shared normalizer.
 // ---------------------------------------------------------------------------
 
-test('cursor: normalizeFinalResult delegates to the shared normalizer', () => {
+test('cursor: cannot emit a public normalized result while unregistered', () => {
   const processResult = {
     exitCode: 0,
     timedOut: false,
@@ -210,14 +209,14 @@ test('cursor: normalizeFinalResult delegates to the shared normalizer', () => {
     stderrTruncated: false,
     durationMs: 5,
   };
-  const env = cursor.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'cursor', processResult }, normalize);
-  assert.equal(env.status, 'success');
-  assert.equal(env.schemaVersion, 2);
-  assert.equal(env.reviewer, 'cursor');
+  assert.throws(
+    () => cursor.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'cursor', processResult }, normalize),
+    /stable contract IDs/
+  );
 });
 
 
-test('cursor: extracts the terminal v2 payload from stream-json NDJSON', () => {
+test('cursor: streamed output remains outside the public result contract', () => {
   const payload = {
     schemaVersion: 2,
     task: 'code',
@@ -243,9 +242,10 @@ test('cursor: extracts the terminal v2 payload from stream-json NDJSON', () => {
     stderrTruncated: false,
     durationMs: 7,
   };
-  const env = cursor.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'cursor', processResult }, normalize);
-  assert.equal(env.status, 'success');
-  assert.equal(env.summary, 'stream ok');
+  assert.throws(
+    () => cursor.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'cursor', processResult }, normalize),
+    /stable contract IDs/
+  );
 });
 test('cursor: cleanup removes the isolated config dir (and the permission file inside it)', async () => {
   const inv = invocation();

@@ -31,8 +31,7 @@
           "enum": [
             "claude",
             "codex",
-            "opencode",
-            "cursor"
+            "opencode"
           ]
         },
         "code": {
@@ -40,8 +39,7 @@
           "enum": [
             "claude",
             "codex",
-            "opencode",
-            "cursor"
+            "opencode"
           ]
         },
         "tests": {
@@ -49,8 +47,7 @@
           "enum": [
             "claude",
             "codex",
-            "opencode",
-            "cursor"
+            "opencode"
           ]
         }
       }
