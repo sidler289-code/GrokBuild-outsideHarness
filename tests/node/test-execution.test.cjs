@@ -104,9 +104,18 @@ test('missing, malformed, or unapproved test events fail closed', () => {
   assert.equal(unapproved.commands.length, 0);
 });
 
+test('safe test environment rejects secrets and language runtime injection variables', () => {
+  for (const name of ['OPENAI_API_KEY', 'TOKEN', 'NODE_OPTIONS', 'BASH_ENV', 'PYTHONPATH']) {
+    assert.throws(
+      () => safeTestEnvironment({ environmentAllowlist: [name], env: { [name]: 'danger' } }),
+      (error) => error instanceof TestExecutionError && error.code === 'unsafe_environment'
+    );
+  }
+});
+
 test('safe test environment keeps a fixed baseline plus explicit allowlist only', () => {
   const env = safeTestEnvironment({
-    environmentAllowlist: ['CI', 'SECRET_SHOULD_NOT_APPEAR'],
+    environmentAllowlist: ['CI'],
     env: { PATH: '/bin', HOME: '/home/tester', CI: '1', SECRET_SHOULD_NOT_APPEAR: 'not-a-secret-here', OTHER: 'discard' },
   });
   assert.equal(env.PATH, '/bin');

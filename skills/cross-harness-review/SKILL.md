@@ -1,11 +1,11 @@
 ---
 name: cross-harness-review
 description: >-
-  Run an explicit, read-only external review through locally configured Claude
-  and Codex CLIs. Primary slash entrypoint for /cross-harness-review. Prefer
+  Run an explicit, read-only external review through a capability-gated local
+  harness adapter. Primary slash entrypoint for /cross-harness-review. Prefer
   the companion skill cross-harness-auto when Grok should decide whether to
   launch a review without a slash command.
-argument-hint: "plan|code|tests|security [scope]"
+argument-hint: "plan|code|tests|security [plan-file] [scope]"
 user-invocable: true
 disable-model-invocation: true
 compatibility: "Requires at least one runnable Claude or Codex CLI."
@@ -23,14 +23,14 @@ Accept exactly one task followed by its task-specific arguments:
 
 ```text
 plan [plan-file]
-code [--uncommitted | --base <branch> | --commit <sha>]
+code <plan-file> [--uncommitted | --base <branch> | --commit <sha>]
 tests [--uncommitted | --base <branch> | --commit <sha>]
 security [--uncommitted | --base <branch> | --commit <sha>]
 ```
 
 For `code`, `tests`, and `security`, default to `--uncommitted`. Treat
-`--uncommitted`, `--base`, and `--commit` as mutually exclusive. For `plan`,
-use only an existing plan file already known in the conversation or explicitly
+`--uncommitted`, `--base`, and `--commit` as mutually exclusive. For `plan`
+and `code`, use only an existing plan file already known in the conversation or explicitly
 provided by the user. If no such file exists, stop with a clear error instead
 of guessing a path.
 
@@ -57,11 +57,14 @@ directory. Do not depend on `GROK_PLUGIN_ROOT`.
 - On PowerShell, call `scripts/invoke.ps1`.
 - On POSIX shells, call `scripts/invoke.sh`.
 
-First run `probe --json`. Then invoke every reviewer reported as runnable with
-`run --reviewer ... --task ... --repo ... --json`. Pass an existing plan as
-`--input-file`. Pass code scope as `uncommitted`, `base:<branch>`, or
-`commit:<sha>`. Prefer the bridge default timeout (300s) unless the user asks
-for a shorter bound.
+First run `detect --json`. Then run exactly one canonical audit command and let
+the host router select configured roles or legacy Claude/Codex fan-out:
+`audit plan --plan-file ... --repo ... --json`,
+`audit code --plan-file ... --repo ... --scope ... --json`, or
+`audit tests --repo ... --json`, or
+`audit security --repo ... --scope ... --json`. Scope selectors are
+`uncommitted`, `base:<branch>`, `commit:<sha>`, or `ref:<a>..<b>`. The legacy
+`probe`, `run`, and `--input-file` spellings remain compatibility aliases only.
 
 Never build a shell command by concatenating user input. Pass every argument as
 an individual process argument. The scripts must receive prompt content through
@@ -70,7 +73,7 @@ stdin rather than command-line arguments.
 ## Handle results honestly
 
 Parse every reviewer result independently against
-`schemas/review-result.schema.json`. Preserve a successful result when the
+`schemas/review-result-v2.schema.json`. Preserve a successful result when the
 other reviewer fails. If both reviewers fail, say that external review was not
 completed; do not describe the local work as externally approved.
 

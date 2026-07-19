@@ -5,6 +5,7 @@ const { spawn } = require('node:child_process');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
+const { runSetup } = require('../../lib/cli.cjs');
 const { repoPath } = require('./helpers/paths.cjs');
 
 const NODE_ENTRYPOINT = repoPath('bin', 'cross-harness-review.cjs');
@@ -73,7 +74,7 @@ test('PowerShell, POSIX, and direct Node entrypoints have equivalent help result
 test('compatibility shims contain no config, discovery, or provider logic', () => {
   const source = `${fs.readFileSync(POWERSHELL_SHIM, 'utf8')}\n${fs.readFileSync(POSIX_SHIM, 'utf8')}`;
   assert.doesNotMatch(source, /CROSS_HARNESS|Get-Candidates|select_capability|Invoke-BoundedProcess/i);
-  assert.doesNotMatch(source, /claude|codex|opencode|antigravity|cursor/i);
+  assert.doesNotMatch(source, /claude|codex|opencode|cursor/i);
   assert.match(source, /cross-harness-review\.cjs/);
 });
 
@@ -99,13 +100,13 @@ test('audit CLI exits non-zero when no reviewer is available (fail-closed)', asy
   assert.notEqual(exitCode, 0, 'audit with no available reviewer must not exit 0');
 });
 
-test('audit CLI fails closed when tests policy has not been configured', async () => {
+test('legacy tests audit is static-only and fails closed when no legacy reviewer is available', async () => {
   const child = spawn(
     process.execPath,
     [NODE_ENTRYPOINT, 'audit', 'tests', '--repo', repoPath()],
     {
       cwd: repoPath(),
-      env: { ...process.env, CROSS_HARNESS_CONFIG: repoPath('.tmp-no-tests-config.json') },
+      env: { ...process.env, PATH: '', CROSS_HARNESS_CONFIG: repoPath('.tmp-no-tests-config.json') },
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     }
@@ -114,9 +115,65 @@ test('audit CLI fails closed when tests policy has not been configured', async (
   child.stdout.on('data', (chunk) => stdout.push(chunk));
   const exitCode = await new Promise((resolve) => child.once('close', resolve));
   assert.notEqual(exitCode, 0);
-  assert.match(Buffer.concat(stdout).toString('utf8'), /Configured user testsExecution policy is required/);
+  assert.match(Buffer.concat(stdout).toString('utf8'), /no reviewer|unavailable/i);
 });
 
+
+function memoryIo() {
+  const stdout = [];
+  const stderr = [];
+  return {
+    stdout: { write: (value) => stdout.push(String(value)) },
+    stderr: { write: (value) => stderr.push(String(value)) },
+    stdoutText: () => stdout.join(''),
+    stderrText: () => stderr.join(''),
+  };
+}
+
+test('setup persists a capability-gated mapping with direct tests disabled by default', async () => {
+  const io = memoryIo();
+  let saved = null;
+  const exitCode = await runSetup(
+    ['--plan', 'claude', '--code', 'claude', '--tests', 'claude', '--json'],
+    io,
+    {
+      detectImpl: async (id) => ({ harnessId: id, available: true, candidate: { path: `/bin/${id}` } }),
+      writeImpl: (draft) => {
+        saved = draft;
+        return { path: '/tmp/config.json', config: draft };
+      },
+    }
+  );
+  assert.equal(exitCode, 0);
+  assert.equal(saved.testsExecution.enabled, false);
+  assert.match(io.stdoutText(), /"configured": true/);
+});
+
+test('setup fails closed when direct tests are enabled without verified capabilities', async () => {
+  const io = memoryIo();
+  let wrote = false;
+  const exitCode = await runSetup(
+    ['--plan', 'claude', '--code', 'claude', '--tests', 'claude', '--enable-tests'],
+    io,
+    {
+      detectImpl: async (id) => ({ harnessId: id, available: true, candidate: { path: `/bin/${id}` } }),
+      writeImpl: () => {
+        wrote = true;
+        throw new Error('must not write');
+      },
+    }
+  );
+  assert.equal(exitCode, 2);
+  assert.equal(wrote, false);
+  assert.match(io.stderrText(), /capability gate for role "tests"/);
+});
+
+test('setup requires all three explicit role assignments', async () => {
+  const io = memoryIo();
+  const exitCode = await runSetup(['--plan', 'claude'], io);
+  assert.equal(exitCode, 2);
+  assert.match(io.stderrText(), /requires --code/);
+});
 function resolvePosixShell() {
   if (process.platform !== 'win32') {
     return 'sh';

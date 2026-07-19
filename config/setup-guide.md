@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Install Grok and at least one authenticated Claude or Codex CLI. The bridge probes every candidate with a five-second `--version` call and selects the highest executable semantic version; a version probe alone is not treated as authentication or quota proof. `git` is required for repository scope snapshots and the host scope gate.
+Install Grok, Node.js 20+, Git, and at least one authenticated supported reviewer CLI. Detection uses a bounded `--version` probe; a version result alone is not authentication, quota, or capability proof.
 
 ## Install
 
@@ -18,18 +18,25 @@ The installed plugin should report two skills (`cross-harness-review`, `cross-ha
 
 ## Overrides
 
+Create a user configuration with direct test execution disabled:
+
 ```text
-CROSS_HARNESS_CLAUDE
-CROSS_HARNESS_CODEX
-CROSS_HARNESS_WSL_DISTRO
-CROSS_HARNESS_TIMEOUT_SECS
-CROSS_HARNESS_MAX_INPUT_BYTES
-CROSS_HARNESS_MAX_DIFF_BYTES
+cross-harness-review detect --json
+cross-harness-review setup --plan claude --code claude --tests claude --json
+cross-harness-review roles --json
 ```
 
-A broken explicit executable override fails closed and does not silently fall back. Set `CROSS_HARNESS_WSL_DISTRO` when the default distribution is not the intended reviewer runtime.
+Only add `--enable-tests` when the selected adapter reports verified structured events, approved-command restriction, and direct execution. The setup command fails closed otherwise.
 
-Default timeout is 300 seconds. Diff snapshots default to 200 KiB.
+```text
+CROSS_HARNESS_CONFIG
+CROSS_HARNESS_CLAUDE_BIN
+CROSS_HARNESS_CODEX_BIN
+CROSS_HARNESS_OPENCODE_BIN
+CROSS_HARNESS_CURSOR_BIN
+```
+
+A broken explicit executable override fails closed and does not silently fall back. Review subprocesses use a 300-second default timeout and capped output.
 
 ## Skills after install
 
@@ -39,8 +46,8 @@ Default timeout is 300 seconds. Diff snapshots default to 200 KiB.
 ## Shell behavior
 
 - PowerShell uses `skills/cross-harness-review/scripts/invoke.ps1`.
-- Linux and WSL use `invoke.sh`.
-- Git Bash keeps the POSIX probe/test implementation, but delegates a real Windows-native Claude invocation to the PowerShell bridge to avoid Windows console/Python pipe corruption.
+- Linux, WSL, and Git Bash use `invoke.sh` when a native executable is available.
+- On Windows, shell wrappers (`.cmd`, `.bat`, `.ps1`) are rejected; configure a native `.exe` override rather than enabling shell parsing.
 
 ## Troubleshooting
 

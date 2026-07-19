@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/cross-harness-review/review-result-v2-codex.schema.json",
+  "title": "Cross-Harness Review Result v2 (Codex-compatible)",
+  "description": "OpenAI strict-mode compatible variant of review-result-v2. Every object has title, additionalProperties:false, and required covers all properties. Optional fields use type:[...,'null'].",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "task",
+    "role",
+    "reviewer",
+    "status",
+    "summary",
+    "planDigest",
+    "requirements",
+    "findings",
+    "testExecution",
+    "diagnostics"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "title": "Schema Version",
+      "type": "integer",
+      "const": 2
+    },
+    "task": {
+      "title": "Task",
+      "type": "string",
+      "enum": ["plan", "code", "tests", "security"]
+    },
+    "role": {
+      "title": "Role",
+      "type": "string",
+      "enum": ["plan", "code", "tests", "security"]
+    },
+    "reviewer": {
+      "title": "Reviewer",
+      "type": "string",
+      "enum": ["claude", "codex", "opencode", "cursor"]
+    },
+    "status": {
+      "title": "Status",
+      "type": "string",
+      "enum": [
+        "success", "unavailable", "invalid_request",
+        "configuration_required", "capability_mismatch",
+        "process_failed", "timed_out", "policy_denied", "invalid_output"
+      ]
+    },
+    "planDigest": {
+      "title": "Plan Digest",
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string",
+      "maxLength": 16384
+    },
+    "requirements": {
+      "title": "Requirements",
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirement" }
+    },
+    "findings": {
+      "title": "Findings",
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "testExecution": {
+      "title": "Test Execution",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempted", "verifiedByEvents", "outcome",
+        "commands", "workspaceChanged", "workspaceChanges", "artifacts"
+      ],
+      "properties": {
+        "attempted": { "title": "Attempted", "type": "boolean" },
+        "verifiedByEvents": { "title": "Verified By Events", "type": "boolean" },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string",
+          "enum": ["passed", "failed", "inconclusive", "not_run", "policy_blocked"]
+        },
+        "commands": {
+          "title": "Commands",
+          "type": "array",
+          "items": { "$ref": "#/$defs/testCommand" }
+        },
+        "workspaceChanged": { "title": "Workspace Changed", "type": "boolean" },
+        "workspaceChanges": {
+          "title": "Workspace Changes",
+          "type": "array",
+          "items": { "type": "string", "maxLength": 4096 }
+        },
+        "artifacts": {
+          "title": "Artifacts",
+          "type": "array",
+          "items": { "type": "string", "maxLength": 4096 }
+        }
+      }
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "durationMs", "stdoutTruncated", "stderrTruncated", "warnings", "rawOutput"
+      ],
+      "properties": {
+        "durationMs": { "title": "Duration Ms", "type": "integer", "minimum": 0 },
+        "stdoutTruncated": { "title": "Stdout Truncated", "type": "boolean" },
+        "stderrTruncated": { "title": "Stderr Truncated", "type": "boolean" },
+        "warnings": {
+          "title": "Warnings",
+          "type": "array",
+          "items": { "type": "string", "maxLength": 4096 }
+        },
+        "rawOutput": {
+          "title": "Raw Output",
+          "type": ["string", "null"],
+          "maxLength": 32768
+        }
+      }
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "title": "Requirement",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "title", "evidence"],
+      "properties": {
+        "id": { "title": "ID", "type": "string", "minLength": 1, "maxLength": 256 },
+        "title": { "title": "Requirement Title", "type": ["string", "null"], "maxLength": 512 },
+        "status": {
+          "title": "Requirement Status",
+          "type": "string",
+          "enum": ["implemented", "partial", "missing", "deviated", "not_verifiable"]
+        },
+        "evidence": {
+          "title": "Requirement Evidence",
+          "type": "array",
+          "items": { "$ref": "#/$defs/requirementEvidence" }
+        }
+      }
+    },
+    "requirementEvidence": {
+      "title": "Requirement Evidence",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "reason", "line", "symbol"],
+      "properties": {
+        "file": { "title": "File", "type": "string", "minLength": 1, "maxLength": 4096 },
+        "line": { "title": "Line", "type": ["integer", "null"], "minimum": 1 },
+        "symbol": { "title": "Symbol", "type": ["string", "null"], "maxLength": 512 },
+        "reason": { "title": "Reason", "type": "string", "minLength": 1, "maxLength": 8192 }
+      }
+    },
+    "finding": {
+      "title": "Finding",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity", "category", "title", "evidence",
+        "recommendation", "confidence", "verification"
+      ],
+      "properties": {
+        "severity": {
+          "title": "Severity",
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"]
+        },
+        "category": { "title": "Category", "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "title": "Finding Title", "type": "string", "minLength": 1, "maxLength": 512 },
+        "evidence": {
+          "title": "Evidence",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file", "line", "symbol", "reason"],
+          "properties": {
+            "file": { "title": "Evidence File", "type": "string", "minLength": 1, "maxLength": 4096 },
+            "line": { "title": "Evidence Line", "type": ["integer", "null"], "minimum": 1 },
+            "symbol": { "title": "Evidence Symbol", "type": ["string", "null"], "maxLength": 512 },
+            "reason": { "title": "Evidence Reason", "type": "string", "minLength": 1, "maxLength": 8192 }
+          }
+        },
+        "recommendation": { "title": "Recommendation", "type": "string", "minLength": 1, "maxLength": 8192 },
+        "confidence": { "title": "Confidence", "type": "number", "minimum": 0, "maximum": 1 },
+        "verification": {
+          "title": "Verification",
+          "type": "string",
+          "enum": ["candidate", "verified", "unverified", "out_of_scope"]
+        }
+      }
+    },
+    "testCommand": {
+      "title": "Test Command",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "argv", "cwd", "exitCode", "durationMs",
+        "timedOut", "stdoutTruncated", "stderrTruncated"
+      ],
+      "properties": {
+        "argv": {
+          "title": "Argv",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "cwd": { "title": "CWD", "type": "string", "minLength": 1, "maxLength": 4096 },
+        "exitCode": { "title": "Exit Code", "type": ["integer", "null"], "minimum": 0 },
+        "durationMs": { "title": "Duration Ms", "type": "integer", "minimum": 0 },
+        "timedOut": { "title": "Timed Out", "type": "boolean" },
+        "stdoutTruncated": { "title": "Stdout Truncated", "type": "boolean" },
+        "stderrTruncated": { "title": "Stderr Truncated", "type": "boolean" }
+      }
+    }
+  }
+}

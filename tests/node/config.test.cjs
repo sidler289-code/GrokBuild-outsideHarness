@@ -260,7 +260,7 @@ test('6.3: rejects unknown role key', () => {
 
 test('6.3: rejects unknown role value', () => {
   assert.throws(
-    () => validateUserConfig(validConfig({ roles: roleMap('gemini', 'claude', 'opencode') })),
+    () => validateUserConfig(validConfig({ roles: roleMap('antigravity', 'claude', 'opencode') })),
     (err) => err instanceof ConfigError && err.code === 'invalid_field'
   );
 });

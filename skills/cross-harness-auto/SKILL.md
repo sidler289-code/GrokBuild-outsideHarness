@@ -48,7 +48,7 @@ Default task mapping:
 - User said no external tools, offline only, or do not call Claude/Codex.
 - Change set is trivial (typo, comment, pure formatting, single rename) and user
   did not ask for review.
-- No runnable reviewer from `probe --json`.
+- No role-eligible reviewer from `detect --json`.
 - Plan task but no concrete plan file is known.
 - The repository path is not the current workspace root (unless the user named
   another repo explicitly).
@@ -62,9 +62,10 @@ Default task mapping:
 2. Resolve the sibling plugin skill directory:
    `../cross-harness-review/` relative to this skill, then `scripts/invoke.ps1`
    or `scripts/invoke.sh`.
-3. Run `probe --json`. If both reviewers are unavailable, stop and say so.
-4. Run every available reviewer with the chosen task/scope. Prefer default
-   timeout (300s). Do not concatenate user input into shell strings.
+3. Run `detect --json`. If no role-eligible reviewer is available, stop and say so.
+4. Run one canonical `audit <task> ... --json` command; configured routing or
+   legacy Claude/Codex fan-out is owned by the host. Prefer the default timeout
+   (300s). Do not concatenate user input into shell strings.
 
 ## After results
 

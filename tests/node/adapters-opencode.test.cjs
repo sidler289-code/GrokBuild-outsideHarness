@@ -45,7 +45,7 @@ test('opencode: registered in the adapter registry', () => {
   assert.ok(listAdapterIds().includes('opencode'));
   assert.equal(getAdapter('opencode'), opencode);
   // Exhaustive registry snapshot. Grows with each adapter PR; cursor joined
-  // in PR-7, antigravity is reserved for PR-8.
+  // in PR-7; the supported adapter set is now complete.
   assert.deepEqual(listAdapterIds().sort(), ['claude', 'codex', 'cursor', 'opencode']);
 });
 
@@ -82,13 +82,13 @@ test('opencode: no permission-bypass or dangerous flags', () => {
   }
 });
 
-test('opencode: argv uses run --format json --pure', () => {
+test('opencode: argv uses documented run --format json flags', () => {
   const inv = invocation();
   assert.equal(inv.args[0], 'run');
   const formatIdx = inv.args.indexOf('--format');
   assert.ok(formatIdx >= 0, 'opencode must set --format');
   assert.equal(inv.args[formatIdx + 1], 'json');
-  assert.ok(inv.args.includes('--pure'), 'opencode must set --pure to skip external plugins');
+  assert.equal(inv.args.includes('--pure'), false, 'undocumented --pure must not be emitted');
 });
 
 // ---------------------------------------------------------------------------
@@ -102,12 +102,16 @@ test('opencode: OPENCODE_CONFIG_CONTENT is valid JSON granting read, denying edi
   assert.doesNotThrow(() => {
     parsed = JSON.parse(inv.env.OPENCODE_CONFIG_CONTENT);
   }, 'OPENCODE_CONFIG_CONTENT must be valid JSON');
-  assert.equal(parsed.permission.read, true);
-  assert.equal(parsed.permission.edit, false);
-  assert.equal(parsed.permission.bash, false);
-  assert.equal(parsed.permission.web, false);
-  // external_directory must be empty (no directory escapes permitted).
-  assert.deepEqual(parsed.permission.external_directory, []);
+  assert.equal(parsed.permission['*'], 'deny');
+  assert.equal(parsed.permission.read, 'allow');
+  assert.equal(parsed.permission.glob, 'allow');
+  assert.equal(parsed.permission.grep, 'allow');
+  assert.equal(parsed.permission.edit, 'deny');
+  assert.equal(parsed.permission.bash, 'deny');
+  assert.equal(parsed.permission.webfetch, 'deny');
+  assert.equal(parsed.permission.websearch, 'deny');
+  assert.equal(parsed.permission.external_directory, 'deny');
+  assert.deepEqual(parsed.plugin, []);
 });
 
 // ---------------------------------------------------------------------------
@@ -138,14 +142,14 @@ test('opencode: config/cache env redirected at a fresh empty temp dir (not the u
   assert.ok(Array.isArray(inv.cleanupPaths) && inv.cleanupPaths.length === 1);
 });
 
-test('opencode: ambient provider credentials are zeroed', () => {
+test('opencode: provider credentials stay available for authentication', () => {
   const inv = invocation();
-  assert.equal(inv.env.OPENAI_API_KEY, '');
-  assert.equal(inv.env.OPENAI_ORGANIZATION, '');
-  assert.equal(inv.env.OPENAI_PROJECT_ID, '');
-  assert.equal(inv.env.ANTHROPIC_API_KEY, '');
-  assert.equal(inv.env.GEMINI_API_KEY, '');
-  assert.equal(inv.env.GOOGLE_API_KEY, '');
+  assert.equal(inv.env.OPENAI_API_KEY, process.env.OPENAI_API_KEY || '');
+  assert.equal(inv.env.OPENAI_ORGANIZATION, process.env.OPENAI_ORGANIZATION || '');
+  assert.equal(inv.env.OPENAI_PROJECT_ID, process.env.OPENAI_PROJECT_ID || '');
+  assert.equal(inv.env.ANTHROPIC_API_KEY, process.env.ANTHROPIC_API_KEY || '');
+  assert.equal(inv.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY || '');
+  assert.equal(inv.env.GOOGLE_API_KEY, process.env.GOOGLE_API_KEY || '');
   assert.equal(inv.env.OPENAI_TELEMETRY_DISABLED, '1');
 });
 
@@ -204,6 +208,34 @@ test('opencode: normalizeFinalResult delegates to the shared normalizer', () => 
   assert.equal(env.reviewer, 'opencode');
 });
 
+
+test('opencode: extracts a v2 payload from JSONL text events', () => {
+  const payload = {
+    schemaVersion: 2,
+    task: 'code',
+    role: 'code',
+    reviewer: 'opencode',
+    status: 'success',
+    summary: 'events ok',
+    requirements: [],
+    findings: [],
+    testExecution: { attempted: false, verifiedByEvents: false, outcome: 'not_run', commands: [], workspaceChanged: false },
+    diagnostics: { durationMs: 9 },
+  };
+  const processResult = {
+    exitCode: 0,
+    timedOut: false,
+    outputLimited: false,
+    stdout: JSON.stringify({ type: 'text', part: { text: JSON.stringify(payload) } }),
+    stderr: '',
+    stdoutTruncated: false,
+    stderrTruncated: false,
+    durationMs: 9,
+  };
+  const env = opencode.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'opencode', processResult }, normalize);
+  assert.equal(env.status, 'success');
+  assert.equal(env.summary, 'events ok');
+});
 test('opencode: cleanup removes the isolated config dir', async () => {
   const inv = invocation();
   const tempDir = inv.cleanupPaths[0];

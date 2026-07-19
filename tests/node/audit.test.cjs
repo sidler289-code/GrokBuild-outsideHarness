@@ -227,6 +227,46 @@ test('runSingleReview plan returns a normalized envelope', async () => {
   }
 });
 
+
+test('runSingleReview cleans adapter resources when the process runner throws', async () => {
+  const { dir, plan } = await writePlan();
+  let cleanupCalls = 0;
+  const adapter = {
+    capabilities: {
+      repoRead: 'verified',
+      structuredOutput: 'verified',
+      writeRestriction: 'verified',
+    },
+    buildInvocation: ({ taskContext }) => ({
+      program: '/bin/fake',
+      args: [],
+      env: {},
+      input: taskContext.prompt,
+      cwd: dir,
+      cleanupPaths: ['/tmp/fake-cleanup'],
+    }),
+    normalizeFinalResult: () => {
+      throw new Error('must not normalize');
+    },
+    cleanup: async () => {
+      cleanupCalls += 1;
+    },
+  };
+  try {
+    await assert.rejects(() => runSingleReview({
+      task: 'plan',
+      reviewer: 'claude',
+      repoRoot: dir,
+      planFile: plan,
+      program: '/bin/fake',
+      adapterOverride: adapter,
+      runImpl: async () => { throw new Error('launcher failed'); },
+    }), /launcher failed/);
+    assert.equal(cleanupCalls, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 test('runSingleReview code requires --scope', async () => {
   const { dir, plan } = await writePlan();
   try {

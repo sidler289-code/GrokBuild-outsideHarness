@@ -1,14 +1,13 @@
 {
   "name": "@sidler289-code/cross-harness-review",
   "version": "0.2.0-dev",
-  "description": "Grok plugin: lets Grok call external coding harnesses (Claude Code, OpenAI Codex, OpenCode, Antigravity, Cursor) as read-only second-opinion reviewers, with a host scope gate and bounded subprocess execution.",
+  "description": "Grok plugin for capability-gated, read-only second-opinion reviews through supported external coding harnesses, with a host scope gate and bounded subprocess execution.",
   "keywords": [
     "grok",
     "grok-plugin",
     "claude-code",
     "codex",
     "opencode",
-    "antigravity",
     "cursor",
     "code-review",
     "second-opinion",

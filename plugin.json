@@ -1,6 +1,6 @@
 {
   "name": "cross-harness-review",
-  "version": "0.1.0",
-  "description": "Read-only Claude/Codex cross-harness review for Grok with scope gates and optional auto-invocation guidance.",
+  "version": "0.2.0-dev",
+  "description": "Read-only cross-harness review for Grok with capability gates, bounded execution, and normalized v2 results.",
   "keywords": ["review", "claude", "codex", "cross-harness", "security", "second-opinion"]
 }

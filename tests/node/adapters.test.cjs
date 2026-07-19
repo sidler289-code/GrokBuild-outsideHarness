@@ -47,7 +47,7 @@ test('adapter registry exposes claude and codex for PR-4', () => {
   assert.equal(getAdapter('claude'), claude);
   assert.equal(getAdapter('codex'), codex);
   assert.throws(
-    () => getAdapter('antigravity'),
+    () => getAdapter('gemini'),
     (err) => err.code === 'unknown_adapter'
   );
 });
@@ -98,7 +98,11 @@ test('codex: no permission-bypass or full-auto flags', () => {
   // Explicitly assert the read-only sandbox is in argv.
   assert.ok(inv.args.includes('--sandbox'));
   const sandboxIdx = inv.args.indexOf('--sandbox');
-  assert.equal(inv.args[sandboxIdx + 1], 'readonly');
+  assert.equal(inv.args[sandboxIdx + 1], 'read-only');
+  assert.ok(inv.args.includes('--ignore-user-config'));
+  assert.ok(inv.args.includes('--ignore-rules'));
+  assert.equal(inv.args.includes('--ask-for-approval'), false);
+  assert.equal(inv.args.includes('--no-project-doc'), false);
 });
 
 // ---------------------------------------------------------------------------
@@ -135,23 +139,24 @@ test('claude: mcp-config points at the empty bundled config', () => {
   assert.equal(inv.args[idx + 1], EMPTY_MCP);
 });
 
-test('claude: env redirects CLAUDE_CONFIG_DIR at a fresh empty temp dir (not the user home)', () => {
+test('claude: safe mode disables ambient extensions while preserving authentication', () => {
   const inv = invocation(claude);
-  // CLAUDE_CONFIG_DIR must point at a real empty temp directory (an empty
-  // string is treated as "unset" by Claude Code and falls back to the user
-  // home, which is what we want to avoid).
-  assert.ok(typeof inv.env.CLAUDE_CONFIG_DIR === 'string' && inv.env.CLAUDE_CONFIG_DIR.length > 0);
-  assert.notEqual(inv.env.CLAUDE_CONFIG_DIR, process.env.HOME);
-  assert.notEqual(inv.env.CLAUDE_CONFIG_DIR, process.env.USERPROFILE);
-  // The temp dir is declared for cleanup.
-  assert.ok(Array.isArray(inv.cleanupPaths) && inv.cleanupPaths.length === 1);
+  assert.ok(inv.args.includes('--safe-mode'));
+  assert.ok(inv.args.includes('--strict-mcp-config'));
+  const toolsIndex = inv.args.indexOf('--tools');
+  assert.equal(inv.args[toolsIndex + 1], 'Read,Glob,Grep');
+  assert.deepEqual(inv.cleanupPaths, []);
+  assert.equal(inv.env.ANTHROPIC_API_KEY, process.env.ANTHROPIC_API_KEY || '');
   assert.equal(inv.env.DISABLE_AUTOUPDATER, '1');
   assert.equal(inv.env.DISABLE_TELEMETRY, '1');
 });
 
-test('codex: env zeroes ambient API key and points CODEX_HOME away', () => {
+test('codex: preserves auth and uses read-only sandbox', () => {
   const inv = invocation(codex);
-  assert.equal(inv.env.OPENAI_API_KEY, '');
+  assert.equal(inv.env.OPENAI_API_KEY, process.env.OPENAI_API_KEY || '');
+  assert.ok(inv.args.includes('--sandbox'));
+  assert.ok(inv.args.includes('read-only'));
+  assert.deepEqual(inv.cleanupPaths, []);
   assert.equal(inv.env.OPENAI_TELEMETRY_DISABLED, '1');
 });
 
@@ -214,14 +219,73 @@ test('claude + codex: normalizeFinalResult delegates to the shared normalizer', 
   }
 });
 
-test('adapters cleanup removes the isolated config dir', async () => {
+
+test('claude: unwraps the documented JSON result wrapper before normalization', () => {
+  const payload = {
+    schemaVersion: 2,
+    task: 'code',
+    role: 'code',
+    reviewer: 'claude',
+    status: 'success',
+    summary: 'wrapper ok',
+    requirements: [],
+    findings: [],
+    testExecution: { attempted: false, verifiedByEvents: false, outcome: 'not_run', commands: [], workspaceChanged: false },
+    diagnostics: { durationMs: 11 },
+  };
+  const processResult = {
+    exitCode: 0,
+    timedOut: false,
+    outputLimited: false,
+    stdout: JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify(payload) }),
+    stderr: '',
+    stdoutTruncated: false,
+    stderrTruncated: false,
+    durationMs: 11,
+  };
+  const env = claude.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'claude', processResult }, normalize);
+  assert.equal(env.status, 'success');
+  assert.equal(env.summary, 'wrapper ok');
+});
+
+test('claude: accepts a result wrapper whose payload contains prose and fenced JSON', () => {
+  const payload = {
+    schemaVersion: 2,
+    task: 'plan',
+    role: 'plan',
+    reviewer: 'claude',
+    status: 'success',
+    summary: 'real CLI fenced payload recovered',
+    requirements: [],
+    findings: [],
+    testExecution: { attempted: false, verifiedByEvents: false, outcome: 'not_run', commands: [], workspaceChanged: false },
+    diagnostics: { durationMs: 0 },
+  };
+  const processResult = {
+    exitCode: 0,
+    timedOut: false,
+    outputLimited: false,
+    stdout: JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      result: `\u5ba1\u67e5\u5df2\u5b8c\u6210\u3002\n\n\`\`\`json\n${JSON.stringify(payload)}\n\`\`\``,
+    }),
+    stderr: '',
+    stdoutTruncated: false,
+    stderrTruncated: false,
+    durationMs: 179_000,
+  };
+
+  const env = claude.normalizeFinalResult({ task: 'plan', role: 'plan', reviewer: 'claude', processResult }, normalize);
+  assert.equal(env.status, 'success');
+  assert.equal(env.summary, 'real CLI fenced payload recovered');
+  assert.equal(env.diagnostics.durationMs, 179_000);
+});
+
+test('claude and codex cleanup are no-ops because auth homes are not replaced', async () => {
   for (const adapter of [claude, codex]) {
     const inv = invocation(adapter);
-    const tempDir = inv.cleanupPaths[0];
-    assert.ok(tempDir, `${adapter.id} should declare a cleanup path`);
-    const fs = require('node:fs');
-    assert.equal(fs.existsSync(tempDir), true, 'temp dir should exist before cleanup');
+    assert.deepEqual(inv.cleanupPaths, []);
     await adapter.cleanup({ cleanupPaths: inv.cleanupPaths });
-    assert.equal(fs.existsSync(tempDir), false, 'temp dir should be removed after cleanup');
   }
 });

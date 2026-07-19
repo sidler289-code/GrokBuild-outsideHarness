@@ -25,6 +25,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 
 const cursor = require('../../lib/adapters/cursor.cjs');
 const { getAdapter, listAdapterIds } = require('../../lib/adapters/index.cjs');
@@ -97,40 +98,36 @@ test('cursor: argv uses --print --output-format stream-json', () => {
 // Per-call permission config file (plan 10.5: plan/code deny all Write + Shell).
 // ---------------------------------------------------------------------------
 
-test('cursor: writes a fresh per-call permission config denying Write/Edit/MultiEdit/Shell/Bash/Terminal', () => {
+test('cursor: writes the documented per-call cli-config permissions', () => {
   const inv = invocation();
-  const permPath = inv.env.CURSOR_PERMISSIONS_FILE;
-  assert.ok(typeof permPath === 'string' && permPath.length > 0);
+  const permPath = path.join(inv.cleanupPaths[0], '.cursor', 'cli-config.json');
   assert.equal(fs.existsSync(permPath), true, 'permission config file must exist on disk');
   let parsed;
   assert.doesNotThrow(() => {
     parsed = JSON.parse(fs.readFileSync(permPath, 'utf8'));
   }, 'permission config file must be valid JSON');
-  assert.equal(parsed.tools.Write, false);
-  assert.equal(parsed.tools.Edit, false);
-  assert.equal(parsed.tools.MultiEdit, false);
-  assert.equal(parsed.tools.Shell, false);
-  assert.equal(parsed.tools.Bash, false);
-  assert.equal(parsed.tools.Terminal, false);
-  assert.deepEqual(parsed.mcp, []);
-  assert.equal(parsed.allowReadOnlyTools, true);
+  assert.deepEqual(parsed, {
+    permissions: {
+      allow: ['Read(**)'],
+      deny: ['Write(**)', 'Shell(*)'],
+    },
+  });
 });
 
-test('cursor: buildReadPermissionConfig always denies every write and shell tool', () => {
+test('cursor: buildReadPermissionConfig uses Cursor permission rule syntax', () => {
   const cfg = cursor.buildReadPermissionConfig();
-  for (const tool of ['Write', 'Edit', 'MultiEdit', 'Shell', 'Bash', 'Terminal']) {
-    assert.equal(cfg.tools[tool], false, `${tool} must be denied`);
-  }
+  assert.deepEqual(cfg.permissions.allow, ['Read(**)']);
+  assert.deepEqual(cfg.permissions.deny, ['Write(**)', 'Shell(*)']);
 });
 
 // ---------------------------------------------------------------------------
 // Read-only capability declarations.
 // ---------------------------------------------------------------------------
 
-test('cursor: read-side capabilities verified; tests-side unknown (fail-closed)', () => {
-  assert.equal(cursor.capabilities.repoRead, 'verified');
-  assert.equal(cursor.capabilities.structuredOutput, 'verified');
-  assert.equal(cursor.capabilities.writeRestriction, 'verified');
+test('cursor: every capability remains unknown until a real CLI probe verifies isolation', () => {
+  assert.equal(cursor.capabilities.repoRead, 'unknown');
+  assert.equal(cursor.capabilities.structuredOutput, 'unknown');
+  assert.equal(cursor.capabilities.writeRestriction, 'unknown');
   // Tests-side stays unknown — keeps the role router honest. Plan 8.5
   // fail-closed: where auto-control cannot be reliably disabled the role
   // must not open.
@@ -219,10 +216,41 @@ test('cursor: normalizeFinalResult delegates to the shared normalizer', () => {
   assert.equal(env.reviewer, 'cursor');
 });
 
+
+test('cursor: extracts the terminal v2 payload from stream-json NDJSON', () => {
+  const payload = {
+    schemaVersion: 2,
+    task: 'code',
+    role: 'code',
+    reviewer: 'cursor',
+    status: 'success',
+    summary: 'stream ok',
+    requirements: [],
+    findings: [],
+    testExecution: { attempted: false, verifiedByEvents: false, outcome: 'not_run', commands: [], workspaceChanged: false },
+    diagnostics: { durationMs: 7 },
+  };
+  const processResult = {
+    exitCode: 0,
+    timedOut: false,
+    outputLimited: false,
+    stdout: [
+      JSON.stringify({ type: 'system', subtype: 'init' }),
+      JSON.stringify({ type: 'result', subtype: 'success', result: JSON.stringify(payload) }),
+    ].join('\n'),
+    stderr: '',
+    stdoutTruncated: false,
+    stderrTruncated: false,
+    durationMs: 7,
+  };
+  const env = cursor.normalizeFinalResult({ task: 'code', role: 'code', reviewer: 'cursor', processResult }, normalize);
+  assert.equal(env.status, 'success');
+  assert.equal(env.summary, 'stream ok');
+});
 test('cursor: cleanup removes the isolated config dir (and the permission file inside it)', async () => {
   const inv = invocation();
   const tempDir = inv.cleanupPaths[0];
-  const permPath = inv.env.CURSOR_PERMISSIONS_FILE;
+  const permPath = path.join(tempDir, '.cursor', 'cli-config.json');
   assert.ok(tempDir, 'cursor should declare a cleanup path');
   assert.equal(fs.existsSync(tempDir), true, 'temp dir should exist before cleanup');
   assert.equal(fs.existsSync(permPath), true, 'permission file should exist before cleanup');
@@ -238,7 +266,9 @@ test('cursor: cleanup removes the isolated config dir (and the permission file i
 test('cursor: each invocation writes a distinct permission-config file path', () => {
   const a = invocation();
   const b = invocation();
-  assert.notEqual(a.env.CURSOR_PERMISSIONS_FILE, b.env.CURSOR_PERMISSIONS_FILE);
+  const aConfig = path.join(a.cleanupPaths[0], '.cursor', 'cli-config.json');
+  const bConfig = path.join(b.cleanupPaths[0], '.cursor', 'cli-config.json');
+  assert.notEqual(aConfig, bConfig);
   assert.notEqual(a.cleanupPaths[0], b.cleanupPaths[0]);
   // Clean both up so the test does not leak temp dirs.
   cursor.cleanup({ cleanupPaths: a.cleanupPaths });

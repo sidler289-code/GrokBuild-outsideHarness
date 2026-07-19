@@ -4,6 +4,44 @@
 
 Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
 
+- The supported harness set is finalized at four: Claude Code, OpenAI Codex,
+  OpenCode, and Cursor. Google Antigravity and its planned PR-8 adapter were
+  removed from discovery, schemas, configuration, documentation, and release
+  scope.
+### Release hardening
+
+These release-hardening entries supersede earlier per-PR slice notes wherever
+the implementation contract changed.
+- Replaced invalid Codex arguments with the current `exec --sandbox read-only
+  --ephemeral --ignore-user-config --ignore-rules --output-schema` contract,
+  while preserving the user's authentication context.
+- Claude now uses `--safe-mode`, a fixed `Read,Glob,Grep` tool set, strict
+  empty MCP config, and no session persistence without hiding its auth home.
+- OpenCode no longer emits the undocumented `--pure` flag. Its inline config
+  uses the documented `allow` / `deny` permission values and disables plugins
+  and instructions.
+- Cursor's config uses the documented `permissions.allow` / `permissions.deny`
+  schema. All Cursor capabilities remain `unknown` until a real installed CLI
+  proves that user/project rules and MCP are isolated, so every role fails
+  closed rather than claiming unverified safety.
+- Claude JSON wrappers, Cursor stream-json NDJSON, and OpenCode JSONL events are
+  unwrapped before the shared v2 normalizer runs.
+- The shared normalizer now also recovers schema-valid JSON from reviewer prose,
+  `json`/untagged Markdown fences, or a balanced outer object. This fixes real
+  Claude runs whose high-quality result was previously mislabeled
+  `invalid_output` solely because Claude decorated the JSON.
+- Windows `.cmd`, `.bat`, and `.ps1` reviewer wrappers are rejected by the
+  argv-only subprocess runner; it never enables `shell:true`. Discovery also
+  prevents an unrelated generic `agent` executable from masquerading as Cursor.
+- Restored the legacy `probe`, `run`, and `--input-file` spellings as aliases
+  for the Node core. Legacy unconfigured `tests` remains a static review and
+  never receives direct execution authority.
+- Added a non-interactive, capability-gated `setup --plan ... --code ...
+  --tests ...` command. Direct tests default to disabled; `--enable-tests`
+  fails closed unless all three execution/event capabilities are verified.
+- Synchronized the plugin manifest with package version `0.2.0-dev` and updated
+  the skills to consume `review-result-v2.schema.json`.
+
 ### PR-7 — Cursor adapter
 
 - **`lib/adapters/cursor.cjs`**: Cursor CLI adapter (plan section 8.5 /
@@ -23,8 +61,7 @@ Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
   `OPENAI_PROJECT_ID` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` /
   `GOOGLE_API_KEY`) are zeroed defensively.
 - **`lib/adapters/index.cjs`**: `cursor` registered; the registry now exposes
-  `claude`, `codex`, `opencode`, `cursor`. antigravity remains reserved for
-  PR-8.
+  `claude`, `codex`, `opencode`, `cursor`.
 - **Capabilities**: read-side (`repoRead`, `structuredOutput`,
   `writeRestriction`) declared `verified`; the three tests-side capabilities
   (`structuredToolEvents`, `approvedCommandRestriction`,
@@ -58,8 +95,8 @@ Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
   `OPENAI_PROJECT_ID` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` /
   `GOOGLE_API_KEY`) are zeroed defensively.
 - **`lib/adapters/index.cjs`**: `opencode` registered; the registry now
-  exposes `claude`, `codex`, `opencode`. antigravity / cursor remain reserved
-  for PR-7 / PR-8.
+  exposes `claude`, `codex`, `opencode`. Cursor was added in PR-7 to complete
+  the four-harness set.
 - **Capabilities**: read-side (`repoRead`, `structuredOutput`,
   `writeRestriction`) declared `verified`; the three tests-side capabilities
   (`structuredToolEvents`, `approvedCommandRestriction`,
@@ -127,7 +164,7 @@ Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
   `createdAt` (plan 6.5), project config load (plan 6.4), and
   `legacy-unconfigured` detection when no file exists (plan 6.6).
 - **`lib/core/discovery.cjs`**: stable harness registry (plan 2.3:
-  claude/codex/opencode/antigravity/cursor), PATH + known-dir candidate
+  claude/codex/opencode/cursor), PATH + known-dir candidate
   discovery, explicit-override fail-closed behavior (plan 7.2), and a bounded
   `--version` probe. `detectLegacyReviewers` reproduces the 0.1.0
   claude-then-codex fan-out order (plan 2.4).
@@ -135,7 +172,7 @@ Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
   (plan 2.2), per-role capability gating that fails closed on `unknown` and
   `failed` (plan 7.3), and the public `roles --json` shape for both
   configured and `legacy-unconfigured` modes (plan 2.4). Never fabricates a
-  role mapping and never implicitly surfaces opencode/antigravity/cursor in
+  role mapping and never implicitly surfaces opencode/cursor in
   legacy mode.
 - **CLI commands**: `config path`, `config show`, `detect [--json]`,
   `doctor [--json]`, `roles [--json]`. `setup` and the `audit` family are

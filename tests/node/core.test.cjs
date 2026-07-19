@@ -7,7 +7,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { EventRecorder } = require('../../lib/core/event-recorder.cjs');
-const { runBoundedProcess } = require('../../lib/core/bounded-process.cjs');
+const { isUnsafeWindowsWrapper, runBoundedProcess } = require('../../lib/core/bounded-process.cjs');
 const { normalizeReviewResult } = require('../../lib/core/normalize-result.cjs');
 const { repoPath } = require('./helpers/paths.cjs');
 
@@ -49,6 +49,14 @@ async function waitForExit(pid, timeoutMs = 2_000) {
   }
   assert.fail(`child process ${pid} survived bounded-process cleanup`);
 }
+
+test('Windows shell wrappers are rejected instead of enabling shell parsing', () => {
+  assert.equal(isUnsafeWindowsWrapper('C:\\tools\\reviewer.cmd'), process.platform === 'win32');
+  assert.equal(isUnsafeWindowsWrapper('C:\\tools\\reviewer.bat'), process.platform === 'win32');
+  assert.equal(isUnsafeWindowsWrapper('C:\\tools\\reviewer.ps1'), process.platform === 'win32');
+  assert.equal(isUnsafeWindowsWrapper('C:\\tools\\reviewer.exe'), false);
+  assert.equal(isUnsafeWindowsWrapper(process.execPath), false);
+});
 
 test('bounded process returns successful stdout and records metadata without prompt text', async () => {
   const events = new EventRecorder();
@@ -201,4 +209,84 @@ test('normalizer accepts a valid v2 envelope and records observed process diagno
   assert.equal(result.status, 'success');
   assert.equal(result.requirements[0].evidence[0].reason, 'covered by a focused test');
   assert.equal(result.diagnostics.durationMs, 12);
+});
+
+test('normalizer extracts a valid v2 envelope from reviewer prose and a JSON Markdown fence', () => {
+  const raw = {
+    schemaVersion: 2,
+    task: 'plan',
+    role: 'plan',
+    reviewer: 'claude',
+    status: 'success',
+    summary: '36 acceptance clauses checked',
+    requirements: [],
+    findings: [],
+    testExecution: {
+      attempted: false,
+      verifiedByEvents: false,
+      outcome: 'not_run',
+      commands: [],
+      workspaceChanged: false,
+    },
+    diagnostics: { durationMs: 0 },
+  };
+  const stdout = `\u4ee5\u4e0b\u662f\u5ba1\u67e5\u7ed3\u679c\u3002\r\n\r\n\`\`\`json\r\n${JSON.stringify(raw)}\r\n\`\`\`\r\n`;
+  const result = normalizeReviewResult({
+    task: 'plan',
+    role: 'plan',
+    reviewer: 'claude',
+    processResult: {
+      exitCode: 0,
+      timedOut: false,
+      outputLimited: false,
+      stdout,
+      stderr: '',
+      stdoutTruncated: false,
+      stderrTruncated: false,
+      durationMs: 179_000,
+    },
+  });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.summary, '36 acceptance clauses checked');
+  assert.equal(result.diagnostics.durationMs, 179_000);
+});
+
+test('normalizer extracts a balanced JSON object from surrounding prose when no fence exists', () => {
+  const raw = {
+    schemaVersion: 2,
+    task: 'code',
+    role: 'code',
+    reviewer: 'claude',
+    status: 'success',
+    summary: 'raw object recovered',
+    requirements: [],
+    findings: [],
+    testExecution: {
+      attempted: false,
+      verifiedByEvents: false,
+      outcome: 'not_run',
+      commands: [],
+      workspaceChanged: false,
+    },
+    diagnostics: { durationMs: 0 },
+  };
+  const result = normalizeReviewResult({
+    task: 'code',
+    role: 'code',
+    reviewer: 'claude',
+    processResult: {
+      exitCode: 0,
+      timedOut: false,
+      outputLimited: false,
+      stdout: `Result follows: ${JSON.stringify(raw)} End of result.`,
+      stderr: '',
+      stdoutTruncated: false,
+      stderrTruncated: false,
+      durationMs: 3,
+    },
+  });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.summary, 'raw object recovered');
 });

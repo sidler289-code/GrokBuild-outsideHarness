@@ -66,7 +66,7 @@ cross-harness-review/
 │   │   │   ├── invoke.ps1      # Windows bridge
 │   │   │   └── invoke.sh       # POSIX / WSL bridge
 │   │   └── schemas/
-│   │       ├── review-result.schema.json   # normalized envelope schema
+│   │       ├── review-result-v2.schema.json # normalized v2 envelope schema
 │   │       └── claude-result.schema.json   # Claude structured-output contract
 │   └── cross-harness-auto/     # model-invocable skill (when to auto-run)
 │       └── SKILL.md
@@ -83,17 +83,18 @@ cross-harness-review/
 
 1. **Grok** parses the request, discloses the data boundary, and resolves the
    sibling `scripts/` directory (no reliance on `GROK_PLUGIN_ROOT`).
-2. **Bridge `probe --json`** discovers every candidate `claude` / `codex` on
-   `PATH`, `%APPDATA%` / `npm`, `%LOCALAPPDATA%`, and WSL; probes each with
-   `--version`; selects the highest executable semantic version.
-3. **Bridge `run`** writes the prompt to **stdin** (never argv), launches the
-   reviewer in a bounded subprocess with a per-run temp dir, a hard timeout
-   (default 300s), and size-capped stdout/stderr.
+2. **`detect --json`** discovers the four supported harness IDs from explicit
+   `*_BIN` overrides, `PATH`, npm's Windows bin directory, and known local bin
+   directories; each candidate receives a bounded `--version` probe.
+3. **`audit`** applies configured role routing (or legacy Claude/Codex fan-out),
+   writes the prompt to **stdin** (never argv), and launches the reviewer in a
+   bounded subprocess with a 300-second timeout and capped stdout/stderr.
 4. **Host scope gate** builds a changed-file allowlist from Git, sends a hard
    scope boundary to the reviewer, and rewrites any finding whose
    `evidence.file` is outside the allowlist to `verification: out_of_scope`.
-5. **Normalization** maps reviewer-specific output (Claude `structured_output`,
-   Codex envelope) into one schema (`review-result.schema.json`).
+5. **Normalization** unwraps Claude JSON (including prose-wrapped Markdown JSON
+   fences), Cursor NDJSON, and OpenCode JSONL into the strict v2 contract
+   (`review-result-v2.schema.json`).
 6. **Grok** opens the cited evidence locally, confirms the call path, and only
    then acts. Reviewer output never edits files on its own.
 
@@ -116,8 +117,6 @@ See [SECURITY.md](SECURITY.md) for the full boundary and known limitations.
   - **Claude Code CLI** (`claude`) — installed and authenticated.
   - **Codex CLI** (`codex`) — installed and authenticated.
 - `git` on `PATH` (used for the scope snapshot and host scope gate).
-- Optional on Windows: **WSL** if you want the reviewer to run inside a Linux
-  distro.
 
 ## Install
 
@@ -177,8 +176,8 @@ Run a probe first to confirm the bridge can see your reviewer CLIs:
 
 ```bash
 # From the plugin root, or wherever invoke.* lives after install
-skills/cross-harness-review/scripts/invoke.ps1 probe --json    # Windows
-skills/cross-harness-review/scripts/invoke.sh probe --json     # POSIX / Git Bash
+skills/cross-harness-review/scripts/invoke.ps1 detect --json   # Windows
+skills/cross-harness-review/scripts/invoke.sh detect --json    # POSIX / Git Bash
 ```
 
 Then ask Grok, either explicitly or in natural language:
@@ -193,11 +192,12 @@ Then ask Grok, either explicitly or in natural language:
 ### Bridge CLI (advanced / scripting)
 
 ```text
-invoke.ps1|invoke.sh probe [--json]
-invoke.ps1|invoke.sh run --reviewer claude|codex --task plan|code|tests|security
-  --repo <absolute-path> [--input-file <absolute-path>]
-  [--scope uncommitted|base:<branch>|commit:<sha>]
-  [--timeout-secs <n>] --json
+invoke.ps1|invoke.sh detect --json
+invoke.ps1|invoke.sh setup --plan <id> --code <id> --tests <id> [--enable-tests]
+invoke.ps1|invoke.sh audit plan --plan-file <path> --repo <path> --json
+invoke.ps1|invoke.sh audit code --plan-file <path> --repo <path> --scope <selector> --json
+invoke.ps1|invoke.sh audit security --repo <path> --scope <selector> --json
+invoke.ps1|invoke.sh audit tests --repo <path> --json
 ```
 
 Never concatenate user input into a shell string — pass every value as an
@@ -207,28 +207,31 @@ individual process argument.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `CROSS_HARNESS_CLAUDE` | Explicit Claude executable path | (auto-discovered) |
-| `CROSS_HARNESS_CODEX` | Explicit Codex executable path | (auto-discovered) |
-| `CROSS_HARNESS_WSL_DISTRO` | Prefer a specific WSL distro | (default distro) |
-| `CROSS_HARNESS_TIMEOUT_SECS` | Per-review process timeout | `300` |
-| `CROSS_HARNESS_MAX_INPUT_BYTES` | Plan input size cap | `1048576` (1 MiB) |
-| `CROSS_HARNESS_MAX_DIFF_BYTES` | Diff snapshot size cap | `204800` (200 KiB) |
-| `CROSS_HARNESS_DEBUG` | `1` emits bridge stack traces on hard errors | (off) |
+| `CROSS_HARNESS_CONFIG` | Absolute user-config path override | platform default |
+| `CROSS_HARNESS_CLAUDE_BIN` | Explicit Claude executable | auto-discovered |
+| `CROSS_HARNESS_CODEX_BIN` | Explicit Codex executable | auto-discovered |
+| `CROSS_HARNESS_OPENCODE_BIN` | Explicit OpenCode executable | auto-discovered |
+| `CROSS_HARNESS_CURSOR_BIN` | Explicit Cursor executable | auto-discovered |
 
 A broken explicit-executable override fails closed — it does **not** silently
 fall back.
 
 ## Status
 
-First public release: **v0.1** (`v0.1` tag, npm `0.1.0`).
+Current checkout: **v0.2.0-dev** (unreleased).
 
 | Area | State |
 |---|---|
-| Plugin install / skills / probe | Ready |
-| PowerShell + POSIX fake CLI matrices | Ready |
+| Node CLI, compatibility shims, detect and setup | Ready |
+| Node offline test matrix | Ready |
 | Scope snapshot + host scope gate | Ready |
-| Real Claude / Codex providers | Supported when CLIs are installed and authenticated |
-| Active MCP server | Not shipped in v0.1 (optional future work) |
+| Claude | Real CLI invocation verified; decorated JSON is normalized before strict v2 validation |
+| Codex / OpenCode adapters | Capability-gated; a local `process_failed` may still require host auth/config diagnosis |
+| Cursor | Detection only until safe isolation is verified; roles fail closed |
+| Direct tests | Disabled unless user + project policy and adapter event capabilities all pass |
+
+See the [v0.2.0 Grok host smoke record](docs/verification/v0.2.0-grok-host-smoke.md)
+for the supplied real-CLI evidence and its host/sandbox boundary.
 
 ## Local validation
 

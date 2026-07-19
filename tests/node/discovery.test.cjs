@@ -25,6 +25,7 @@ const {
   buildSearchDirs,
   resolveOverride,
   discoverCandidates,
+  candidateIdentityMatches,
   parseVersion,
   probeVersion,
   detectHarness,
@@ -69,17 +70,14 @@ function writeBrokenBin(dir, name) {
 // 2.3 Harness registry.
 // ---------------------------------------------------------------------------
 
-test('2.3: registry exposes exactly the five stable harness ids', () => {
-  assert.deepEqual(Object.keys(HARNESS_REGISTRY).sort(), ['antigravity', 'claude', 'codex', 'cursor', 'opencode']);
+test('2.3: registry exposes exactly the four supported harness ids', () => {
+  assert.deepEqual(Object.keys(HARNESS_REGISTRY).sort(), ['claude', 'codex', 'cursor', 'opencode']);
 });
 
 test('2.3: cursor registry records cursor-agent primary and agent alias', () => {
   assert.deepEqual(HARNESS_REGISTRY.cursor.binaryNames, ['cursor-agent', 'agent']);
 });
 
-test('2.3: antigravity binary is agy', () => {
-  assert.deepEqual(HARNESS_REGISTRY.antigravity.binaryNames, ['agy']);
-});
 
 test('2.3: each registry entry has an env override name', () => {
   for (const entry of Object.values(HARNESS_REGISTRY)) {
@@ -230,6 +228,13 @@ test('detectHarness reports available when probe prints a version', async () => 
       home: os.homedir(),
       searchDirs: [dir],
       timeoutMs: 4_000,
+      runImpl: async () => ({
+        exitCode: 0,
+        startError: null,
+        stdout: 'codex-cli 1.2.3',
+        stderr: '',
+        timedOut: false,
+      }),
     });
     assert.equal(result.available, true);
     assert.equal(result.reason, null);
@@ -237,6 +242,19 @@ test('detectHarness reports available when probe prints a version', async () => 
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('cursor generic agent alias must identify itself as Cursor', () => {
+  const genericAgent = { binaryName: 'agent', path: 'C:/tools/agent.exe' };
+  assert.equal(
+    candidateIdentityMatches('cursor', genericAgent, { stdout: 'Grok agent 0.9.0', stderr: '' }),
+    false
+  );
+  assert.equal(
+    candidateIdentityMatches('cursor', genericAgent, { stdout: 'Cursor Agent 2026.07', stderr: '' }),
+    true
+  );
+  assert.equal(candidateIdentityMatches('codex', genericAgent, { stdout: 'anything', stderr: '' }), true);
 });
 
 test('detectHarness reports spawn_failed / version_probe_failed on bad binaries', async () => {

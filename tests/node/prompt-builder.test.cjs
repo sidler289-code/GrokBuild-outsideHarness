@@ -31,6 +31,7 @@ test('buildPrompt plan includes plan file and output contract, no scope boundary
   assert.match(prompt, /PLAN FILE: \/plan\.md/);
   assert.match(prompt, /PLAN DIGEST: sha256:a{64}/);
   assert.match(prompt, /OUTPUT CONTRACT/);
+
   assert.doesNotMatch(prompt, /SCOPE BOUNDARY/);
 });
 

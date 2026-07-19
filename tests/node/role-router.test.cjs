@@ -119,6 +119,20 @@ test('assertRoleMappingPassesGates: tests role requires directTestExecution veri
 });
 
 // ---------------------------------------------------------------------------
+
+test('disabled direct tests do not make configured plan/code routing unusable', () => {
+  const readOnlyCaps = {
+    claude: {
+      ...allVerified(),
+      structuredToolEvents: 'unknown',
+      approvedCommandRestriction: 'unknown',
+      directTestExecution: 'unknown',
+    },
+  };
+  assert.doesNotThrow(() => assertRoleMappingPassesGates(
+    { plan: 'claude', code: 'claude', tests: 'claude' }, readOnlyCaps, { testsExecutionEnabled: false }
+  ));
+});
 // 2.4 Legacy-unconfigured routing.
 // ---------------------------------------------------------------------------
 
@@ -170,7 +184,7 @@ test('2.4: routeLegacy returns empty reviewers when both unavailable', () => {
   assert.deepEqual(unavailable, ['claude', 'codex']);
 });
 
-test('2.4: legacy report never lists opencode/antigravity/cursor', () => {
+test('2.4: legacy report never implicitly lists opencode/cursor', () => {
   // detectImpl is injectable; supply only legacy ids, ensure the report shape
   // does not surface the new adapters even if a buggy detector returned them.
   const report = legacyRolesReport({
