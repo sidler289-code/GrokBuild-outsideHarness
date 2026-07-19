@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.0-dev (unreleased)
+
+Work-in-progress 0.2.0 delivery. Each PR is independently mergeable.
+
+### PR-3 — Config, discovery, doctor and role routing
+
+- **`lib/core/config.cjs`**: the single owner of user-config path resolution
+  (plan 6.2 priority: `CROSS_HARNESS_CONFIG` > Windows `LOCALAPPDATA`/`USERPROFILE`
+  > POSIX `XDG_CONFIG_HOME`/`~/.config`), runtime schema validation (plan 6.3
+  with `additionalProperties:false`, required roles, `testsExecution`
+  boundaries, ISO 8601 timestamps), atomic write with `.bak` and preserved
+  `createdAt` (plan 6.5), project config load (plan 6.4), and
+  `legacy-unconfigured` detection when no file exists (plan 6.6).
+- **`lib/core/discovery.cjs`**: stable harness registry (plan 2.3:
+  claude/codex/opencode/antigravity/cursor), PATH + known-dir candidate
+  discovery, explicit-override fail-closed behavior (plan 7.2), and a bounded
+  `--version` probe. `detectLegacyReviewers` reproduces the 0.1.0
+  claude-then-codex fan-out order (plan 2.4).
+- **`lib/core/role-router.cjs`**: 1/2/3-harness role allocation state machine
+  (plan 2.2), per-role capability gating that fails closed on `unknown` and
+  `failed` (plan 7.3), and the public `roles --json` shape for both
+  configured and `legacy-unconfigured` modes (plan 2.4). Never fabricates a
+  role mapping and never implicitly surfaces opencode/antigravity/cursor in
+  legacy mode.
+- **CLI commands**: `config path`, `config show`, `detect [--json]`,
+  `doctor [--json]`, `roles [--json]`. `setup` and the `audit` family are
+  reserved for later 0.2.0 PRs and refuse non-interactively.
+- **Tests**: `tests/node/config.test.cjs`, `discovery.test.cjs`,
+  `role-router.test.cjs`. Full suite: 106 passing.
+
 ## 0.1.0 — 2026-07-17 (first public release, tag `v0.1`)
 
 ### Added
