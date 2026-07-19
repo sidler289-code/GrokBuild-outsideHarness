@@ -32,9 +32,14 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "cross-harness-review": "bin/cross-harness-review.cjs"
+  },
   "scripts": {
     "test:node": "node --test --test-reporter=spec \"tests/node/**/*.test.cjs\"",
-    "test:node:contracts": "node --test --test-reporter=spec tests/node/contracts.test.cjs"
+    "test:node:contracts": "node --test --test-reporter=spec tests/node/contracts.test.cjs",
+    "test:node:core": "node --test --test-reporter=spec tests/node/core.test.cjs",
+    "test:node:entrypoints": "node --test --test-reporter=spec tests/node/entrypoints.test.cjs"
   },
   "files": [
     "plugin.json",
