@@ -99,17 +99,22 @@ test('audit CLI exits non-zero when no reviewer is available (fail-closed)', asy
   assert.notEqual(exitCode, 0, 'audit with no available reviewer must not exit 0');
 });
 
-test('audit CLI rejects the tests task (PR-5 scope)', async () => {
+test('audit CLI fails closed when tests policy has not been configured', async () => {
   const child = spawn(
     process.execPath,
     [NODE_ENTRYPOINT, 'audit', 'tests', '--repo', repoPath()],
-    { cwd: repoPath(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+    {
+      cwd: repoPath(),
+      env: { ...process.env, CROSS_HARNESS_CONFIG: repoPath('.tmp-no-tests-config.json') },
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }
   );
-  const stderr = [];
-  child.stderr.on('data', (chunk) => stderr.push(chunk));
+  const stdout = [];
+  child.stdout.on('data', (chunk) => stdout.push(chunk));
   const exitCode = await new Promise((resolve) => child.once('close', resolve));
   assert.notEqual(exitCode, 0);
-  assert.match(Buffer.concat(stderr).toString('utf8'), /PR-5/);
+  assert.match(Buffer.concat(stdout).toString('utf8'), /Configured user testsExecution policy is required/);
 });
 
 function resolvePosixShell() {

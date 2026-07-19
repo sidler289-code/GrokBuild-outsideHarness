@@ -83,11 +83,19 @@ test('buildPrompt rejects invalid planDigest', () => {
   );
 });
 
-test('buildPrompt refuses tests task', () => {
+test('buildPrompt tests requires a closed approved-command allowlist', () => {
   assert.throws(
     () => buildPrompt({ task: 'tests', repoRoot: '/repo' }),
-    (err) => err instanceof PromptBuilderError && err.code === 'invalid_task'
+    (err) => err instanceof PromptBuilderError && err.code === 'missing_test_commands'
   );
+  const prompt = buildPrompt({
+    task: 'tests',
+    repoRoot: '/repo',
+    approvedCommands: [{ id: 'unit', argv: ['node', '--test'], cwd: '/repo', displayCwd: '.' }],
+  });
+  assert.match(prompt, /TASK: direct test audit/);
+  assert.match(prompt, /APPROVED TEST COMMANDS/);
+  assert.match(prompt, /\["node","--test"\]/);
 });
 
 test('buildPrompt rejects unknown task', () => {

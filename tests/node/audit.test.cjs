@@ -248,11 +248,88 @@ test('runSingleReview code requires --scope', async () => {
   }
 });
 
-test('runSingleReview refuses tests task', async () => {
-  await assert.rejects(
-    () => runSingleReview({ task: 'tests', reviewer: 'claude', repoRoot: '/repo', program: '/bin/claude' }),
-    (err) => err instanceof AuditError && err.code === 'invalid_request'
-  );
+test('runSingleReview tests fails closed when user policy is disabled', async () => {
+  const env = await runSingleReview({
+    task: 'tests',
+    reviewer: 'claude',
+    repoRoot: '/repo',
+    program: '/bin/claude',
+    userConfig: {
+      configured: true,
+      config: { testsExecution: { enabled: false, mode: 'host-bounded', defaultTimeoutSeconds: 10, maxOutputBytes: 65536 } },
+    },
+  });
+  assert.equal(env.status, 'policy_denied');
+  assert.equal(env.testExecution.outcome, 'policy_blocked');
+});
+
+test('runSingleReview tests accepts only host-verified command events', async () => {
+  const { dir } = await writePlan();
+  try {
+    let gitStatusCalls = 0;
+    const runImpl = async (opts) => {
+      if (opts.program === 'git') {
+        gitStatusCalls += 1;
+        return {
+          exitCode: 0, signal: null, startError: null, timedOut: false, outputLimited: false,
+          stdout: gitStatusCalls === 1 ? '' : '?? generated/\0',
+          stderr: '', stdoutTruncated: false, stderrTruncated: false, durationMs: 1,
+        };
+      }
+      return {
+        exitCode: 0, signal: null, startError: null, timedOut: false, outputLimited: false,
+        stdout: JSON.stringify(validEnvelope({
+          task: 'tests',
+          role: 'tests',
+          testExecution: { attempted: true, verifiedByEvents: false, outcome: 'passed', commands: [], workspaceChanged: false },
+        })),
+        stderr: '', stdoutTruncated: false, stderrTruncated: false, durationMs: 5,
+      };
+    };
+    const adapter = {
+      capabilities: {
+        repoRead: 'verified',
+        structuredOutput: 'verified',
+        structuredToolEvents: 'verified',
+        approvedCommandRestriction: 'verified',
+        directTestExecution: 'verified',
+      },
+      buildInvocation: ({ program, taskContext }) => {
+        assert.deepEqual(taskContext.approvedCommands.map((command) => command.id), ['unit']);
+        return { program, args: ['--fixed'], env: {}, input: taskContext.prompt, cwd: taskContext.repoRoot };
+      },
+      parseEvents: () => [{
+        type: 'test_command_finished',
+        data: { argv: ['node', '--test'], cwd: '.', exitCode: 0, durationMs: 8, timedOut: false, stdout: 'ok', stderr: '' },
+      }],
+      normalizeFinalResult: ({ task, role, reviewer, processResult }, normalizer) =>
+        normalizer.normalizeReviewResult({ task, role, reviewer, processResult }),
+      cleanup: () => Promise.resolve(),
+    };
+    const env = await runSingleReview({
+      task: 'tests',
+      reviewer: 'claude',
+      repoRoot: dir,
+      program: '/bin/claude',
+      userConfig: {
+        configured: true,
+        config: { testsExecution: { enabled: true, mode: 'host-bounded', defaultTimeoutSeconds: 10, maxOutputBytes: 65536 } },
+      },
+      projectConfig: {
+        schemaVersion: 1,
+        testsExecution: { commands: [{ id: 'unit', argv: ['node', '--test'], cwd: '.' }] },
+      },
+      runImpl,
+      adapterOverride: adapter,
+    });
+    assert.equal(env.status, 'success');
+    assert.equal(env.testExecution.verifiedByEvents, true);
+    assert.equal(env.testExecution.outcome, 'passed');
+    assert.equal(env.testExecution.workspaceChanged, true);
+    assert.deepEqual(env.testExecution.workspaceChanges, ['?? generated/']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('runSingleReview plan requires --plan-file', async () => {
